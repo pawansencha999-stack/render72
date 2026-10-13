@@ -131,6 +131,12 @@ export function startEventsPage() {
   };
 
   // ---- render -------------------------------------------------------------
+  /** Re-append rows only when the order actually differs, to avoid needless layout work. */
+  const placeInOrder = (list: HTMLElement, items: HTMLElement[]) => {
+    const current = Array.from(list.children);
+    if (current.length === items.length && items.every((el, i) => current[i] === el)) return;
+    items.forEach((r) => list.appendChild(r));
+  };
   let state = read();
   toForm(state);
 
@@ -139,14 +145,17 @@ export function startEventsPage() {
     const tokens = s.q.toLowerCase().split(/\s+/).filter(Boolean);
     const visible = rows.filter((r) => matches(r, s, tokens));
     const vis = new Set(visible);
-    rows.forEach((r) => (r.hidden = !vis.has(r)));
+    rows.forEach((r) => {
+      const hide = !vis.has(r);
+      if (r.hidden !== hide) r.hidden = hide;
+    });
 
     const grouped = s.sort === 'date' && s.day === 'all';
     if (grouped) {
       // Put each row back in its day, in time order.
       homes.forEach((ul, g) => {
         const own = rows.filter((r) => r.dataset.home === g).sort((a, b) => key(a, 'date') - key(b, 'date'));
-        own.forEach((r) => ul.appendChild(r));
+        placeInOrder(ul, own);
       });
       groups.forEach((g) => {
         const id = g.dataset.group!;
@@ -159,7 +168,7 @@ export function startEventsPage() {
     } else {
       groups.forEach((g) => (g.hidden = g.dataset.group !== 'flat'));
       visible.sort((a, b) => key(a, s.sort) - key(b, s.sort) || key(a, 'date') - key(b, 'date'));
-      visible.forEach((r) => flatList.appendChild(r));
+      placeInOrder(flatList, visible);
       flatGroup.hidden = visible.length === 0;
       const sortLabel = sortSel.options[sortSel.selectedIndex]?.text.toLowerCase();
       const dayLabel = s.day === 'all' ? 'All upcoming' : s.day === 'past' ? 'Already happened' : dayLabels.get(s.day) ?? '';
@@ -169,10 +178,12 @@ export function startEventsPage() {
     // Timetable: dim what the filters leave out so clashes stay visible.
     bars.forEach((b) => {
       const on = matches(b, { ...s, day: 'all' }, tokens);
-      b.classList.toggle('dim', !on);
-      b.querySelector('a')?.setAttribute('tabindex', on ? '0' : '-1');
-      if (on) b.removeAttribute('aria-hidden');
-      else b.setAttribute('aria-hidden', 'true');
+      if (b.classList.contains('dim') === on) {
+        b.classList.toggle('dim', !on);
+        b.querySelector('a')?.setAttribute('tabindex', on ? '0' : '-1');
+        if (on) b.removeAttribute('aria-hidden');
+        else b.setAttribute('aria-hidden', 'true');
+      }
     });
     ttDays.forEach((d) => (d.hidden = s.day === 'past' || (s.day !== 'all' && d.dataset.day !== s.day)));
     if (ttPast) ttPast.hidden = s.day !== 'past';
@@ -263,6 +274,13 @@ export function startEventsPage() {
   setInterval(placeNow, 60_000);
 
   // Live seat counts can change what "Open for registration" and "Fewest seats" show.
-  onLive(() => render());
+  // Live counts only change the result when a filter or sort depends on them.
+  let lastLiveKey = '';
+  onLive(() => {
+    const key = rows.map((r) => `${r.dataset.open}${r.dataset.seats}`).join(',');
+    if (key === lastLiveKey) return;
+    lastLiveKey = key;
+    if (state.f.has('open') || state.sort === 'seats') render();
+  });
   render();
 }

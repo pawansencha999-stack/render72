@@ -2,8 +2,7 @@
 
 **Every club event on campus, in one place.** A landing page and events pages for the Render72 Events API, built for the Render72 frontend and design hackathon run by CORE Lab.
 
-- **Live site:** _add your deployment URL here_
-- **Design file:** _optional, add your Figma link here_
+- **Live site:** https://render72.vercel.app
 
 ![The landing page at desktop width](docs/home.jpg)
 
@@ -48,15 +47,15 @@ The site never depends on the API being up at the moment someone visits.
 
 ## Performance and scores
 
-Measured locally with Lighthouse 13.5 against the production build served with Brotli compression (mobile and desktop presets):
+Measured with Lighthouse 13.5 (mobile and desktop presets), against the production build served locally with Brotli compression and against the live site on Vercel:
 
 | Page | Performance | Accessibility | Best practices | SEO |
 | --- | --- | --- | --- | --- |
-| `/` | 100 | 100 | 100 | 100 |
-| `/events/` | 100 | 100 | 100 | 100 |
-| `/events/civicforge-24-build-for-the-city/` | 100 | 100 | 100 | 100 |
+| `/` | 99–100 | 100 | 100 | 100 |
+| `/events/` | 99–100 | 100 | 100 | 100 |
+| `/events/civicforge-24-build-for-the-city/` | 99–100 | 100 | 100 | 100 |
 
-These are local measurements. Re-check them on [PageSpeed Insights](https://pagespeed.web.dev) after each deploy.
+On the live site, mobile runs scored 99 for Performance on `/` and `/events/` (LCP 1.7 s, no blocking time) and 100 for the other three categories. These were run from a development machine; [PageSpeed Insights](https://pagespeed.web.dev) runs the same test from Google's servers, so check there after each deploy.
 
 How it gets there:
 
@@ -102,7 +101,7 @@ Optional environment variables:
 
 **Cloudflare Pages:** connect the repo, choose the Astro preset (build command `npm run build`, output `dist`), and add the environment variables `NODE_VERSION=22` and `SITE_URL=<your pages.dev URL>`.
 
-**Vercel:** import the repo; Astro is detected automatically. Add `SITE_URL`.
+**Vercel** (used for the live site): import the repo and deploy. Astro is detected automatically, and the production address is picked up without setting `SITE_URL`.
 
 **Netlify:** build command `npm run build`, publish directory `dist`, `NODE_VERSION=22`.
 

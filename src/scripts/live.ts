@@ -98,8 +98,14 @@ export async function fetchEvent(id: string): Promise<any | null> {
 
 // ---- writing values into the page ---------------------------------------
 
+/** Writes only when the value changes, so a refresh with the same numbers costs no layout. */
 function setText(scope: ParentNode, sel: string, text: string) {
-  scope.querySelectorAll<HTMLElement>(sel).forEach((n) => { n.textContent = text; });
+  scope.querySelectorAll<HTMLElement>(sel).forEach((n) => {
+    if (n.textContent !== text) n.textContent = text;
+  });
+}
+function setData(el: HTMLElement, key: string, value: string) {
+  if (el.dataset[key] !== value) el.dataset[key] = value;
 }
 
 /** Patch one event's numbers everywhere it appears on the page. */
@@ -114,17 +120,24 @@ export function applyEvent(id: string, live: LiveFields | null, now = Date.now()
       return;
     }
     const a = availability(live, now);
-    el.dataset.avail = a.key;
-    el.dataset.open = a.canRegister ? '1' : '0';
-    el.dataset.seats = String(a.seatsLeft);
+    setData(el, 'avail', a.key);
+    setData(el, 'open', a.canRegister ? '1' : '0');
+    setData(el, 'seats', String(a.seatsLeft));
     setText(el, '[data-f="seats"]', a.seatsText);
     setText(el, '[data-f="left"]', String(a.seatsLeft));
     el.querySelectorAll<HTMLElement>('[data-f="status"]').forEach((n) => {
-      n.textContent = a.label;
-      n.dataset.avail = a.key;
+      if (n.textContent !== a.label) n.textContent = a.label;
+      setData(n, 'avail', a.key);
     });
-    el.querySelectorAll<HTMLElement>('[data-f="meter"]').forEach((n) => n.style.setProperty('--fill', String(a.fill)));
-    el.querySelectorAll<HTMLElement>('[data-f="register"]').forEach((b) => setRegister(b, a.canRegister, a.key));
+    const fill = a.fill.toFixed(3);
+    el.querySelectorAll<HTMLElement>('[data-f="meter"]').forEach((n) => {
+      if (n.style.getPropertyValue('--fill') !== fill) n.style.setProperty('--fill', fill);
+    });
+    el.querySelectorAll<HTMLElement>('[data-f="register"]').forEach((b) => {
+      const isLink = b.tagName === 'A';
+      const stale = isLink !== a.canRegister || (!isLink && b.textContent !== (CLOSED_LABEL[a.key] ?? 'Registration closed'));
+      if (stale) setRegister(b, a.canRegister, a.key);
+    });
   });
 }
 
@@ -171,7 +184,7 @@ function applyAggregates(list: LiveFields[]) {
   };
   document.querySelectorAll<HTMLElement>('[data-agg]').forEach((n) => {
     const v = values[n.dataset.agg!];
-    if (typeof v === 'number') n.textContent = groupIN(v);
+    if (typeof v === 'number' && n.textContent !== groupIN(v)) n.textContent = groupIN(v);
   });
 }
 
