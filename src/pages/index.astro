@@ -126,7 +126,7 @@ const jsonLd = {
   </section>
 
   <!-- FINDER -->
-  <section class="finder chapter" data-chapter="paper" aria-labelledby="finder-title">
+  <section class="finder chapter defer" data-chapter="paper" aria-labelledby="finder-title">
     <div class="wrap">
       <h2 id="finder-title" class="head finder-title" data-reveal>What do you feel like doing this weekend?</h2>
       <div class="finder-body grid">
@@ -171,7 +171,7 @@ const jsonLd = {
 
   <!-- ORGANISERS' PICKS -->
   {picks.length >= 3 && (
-    <section class="picks chapter" data-chapter="paper" aria-labelledby="picks-title">
+    <section class="picks chapter defer" data-chapter="paper" aria-labelledby="picks-title">
       <div class="wrap">
         <h2 id="picks-title" class="head picks-title" data-reveal>Picked by the organisers</h2>
       </div>
@@ -194,7 +194,7 @@ const jsonLd = {
   )}
 
   <!-- THE WEEKEND -->
-  <section class="weekend chapter" data-chapter="tone" aria-labelledby="weekend-title">
+  <section class="weekend chapter defer" data-chapter="tone" aria-labelledby="weekend-title">
     <div class="wrap">
       <h2 id="weekend-title" class="head" data-reveal>The whole weekend</h2>
       {ov.first && ov.last && lastBlock && (
@@ -227,7 +227,7 @@ const jsonLd = {
   </section>
 
   <!-- HOW IT WORKS -->
-  <section id="how" class="faq chapter" data-chapter="paper" aria-labelledby="faq-title">
+  <section id="how" class="faq chapter defer" data-chapter="paper" aria-labelledby="faq-title">
     <div class="wrap">
       <h2 id="faq-title" class="head" data-reveal>How registration works</h2>
       <div class="qs">
@@ -260,7 +260,7 @@ const jsonLd = {
   </section>
 
   <!-- CLOSE -->
-  <section class="close chapter" data-chapter="navy" aria-labelledby="close-title">
+  <section class="close chapter defer" data-chapter="navy" aria-labelledby="close-title">
     <div class="wrap">
       <h2 id="close-title" class="display close-title" data-reveal>
         {firstDay ? <>See you<br />on {fmtDay(firstDay, 'weekday')}.</> : <>See you at<br />the next one.</>}

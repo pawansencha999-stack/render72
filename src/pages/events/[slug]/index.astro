@@ -184,7 +184,7 @@ const jsonLd = {
     </nav>
 
     <div class="wrap body">
-      <section id="about" class="block" aria-labelledby="h-about">
+      <section id="about" class="block defer" aria-labelledby="h-about">
         <h2 id="h-about" class="head h2">About</h2>
         <div class="cols">
           <div class="prose measure">{paragraphs.map((p) => <p>{p}</p>)}</div>
@@ -210,7 +210,7 @@ const jsonLd = {
         )}
       </section>
 
-      <section id="schedule" class="block" aria-labelledby="h-schedule">
+      <section id="schedule" class="block defer" aria-labelledby="h-schedule">
         <h2 id="h-schedule" class="head h2">Schedule</h2>
         <table class="sched">
           <caption class="visually-hidden">Sessions, in Indian Standard Time</caption>
@@ -229,7 +229,7 @@ const jsonLd = {
       </section>
 
       {e.prizes.length > 0 && (
-        <section id="prizes" class="block chapter prizes" data-chapter="navy" aria-labelledby="h-prizes">
+        <section id="prizes" class="block chapter prizes defer" data-chapter="navy" aria-labelledby="h-prizes">
           <h2 id="h-prizes" class="head h2">Prizes <span class="soft total num">{fmtRupees(prizeTotal)} in total</span></h2>
           <ol class="prize-list plain" role="list">
             {e.prizes.map((p) => (
@@ -244,7 +244,7 @@ const jsonLd = {
         </section>
       )}
 
-      <section id="entry" class="block" aria-labelledby="h-entry">
+      <section id="entry" class="block defer" aria-labelledby="h-entry">
         <h2 id="h-entry" class="head h2">Who can enter</h2>
         <div class="two">
           <div>
@@ -262,14 +262,14 @@ const jsonLd = {
       </section>
 
       {e.rules.length > 0 && (
-        <section id="rules" class="block" aria-labelledby="h-rules">
+        <section id="rules" class="block defer" aria-labelledby="h-rules">
           <h2 id="h-rules" class="head h2">Rules</h2>
           <ol class="rules">{e.rules.map((r) => <li>{r}</li>)}</ol>
         </section>
       )}
 
       {e.gallery_images.length > 0 && (
-        <section class="block gallery" aria-label="Photos">
+        <section class="block gallery defer" aria-label="Photos">
           {e.gallery_images.slice(0, 2).map((g, i) => (
             <Pic src={g} alt={`${v.title}: photo ${i + 1}`} widths={[480, 800, 1200]} ratio={i === 0 ? [4, 3] : [3, 4]} formats={['webp']} sizes="(min-width: 900px) 45vw, 100vw" />
           ))}
@@ -277,7 +277,7 @@ const jsonLd = {
       )}
 
       {e.faqs.length > 0 && (
-        <section id="questions" class="block" aria-labelledby="h-q">
+        <section id="questions" class="block defer" aria-labelledby="h-q">
           <h2 id="h-q" class="head h2">Questions</h2>
           <div class="qs">
             {e.faqs.map((f, i) => (
@@ -290,7 +290,7 @@ const jsonLd = {
         </section>
       )}
 
-      <section id="contact" class="block" aria-labelledby="h-contact">
+      <section id="contact" class="block defer" aria-labelledby="h-contact">
         <h2 id="h-contact" class="head h2">Contact</h2>
         <div class="contacts">
           {e.organizers.map((o) => (
@@ -313,7 +313,7 @@ const jsonLd = {
     </div>
 
     {related.length > 0 && (
-      <section class="related chapter" data-chapter="tone" aria-labelledby="h-related">
+      <section class="related chapter defer" data-chapter="tone" aria-labelledby="h-related">
         <div class="wrap">
           <h2 id="h-related" class="head h2">More {fmtDay(v.firstDay, 'weekday')} events</h2>
           <ul class="rows plain" role="list">
@@ -420,7 +420,7 @@ const jsonLd = {
   .on-page { --focus: var(--paper); }
 
   .body { padding-bottom: var(--section); }
-  .block { padding-top: clamp(4rem, 8vw, 7rem); scroll-margin-top: calc(var(--header-h) + 3.25rem); }
+  .block { padding-top: clamp(4rem, 8vw, 7rem); scroll-margin-top: calc(var(--header-h) + 3.25rem); contain-intrinsic-size: auto 600px; }
   .h2 { font-size: clamp(2.5rem, 1.6rem + 3vw, 4.5rem); margin-bottom: clamp(1.5rem, 3vw, 2.5rem); }
   .h3 { font-size: 1.1875rem; font-weight: 650; margin-bottom: 0.75rem; }
   .cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 3rem var(--gutter); }

@@ -74,6 +74,9 @@ const filters = [
     padding: 1rem;
     margin-inline: -1rem;
     transition: background-color var(--t-hover) ease;
+    /* Rows off screen skip layout until they are scrolled near. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 220px;
   }
   .ev:nth-child(even) { background: #f6f7f9; }
   .ev:hover { background: var(--tone); }
