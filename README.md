@@ -55,12 +55,14 @@ Measured with Lighthouse 13.5 (mobile and desktop presets), against the producti
 | `/events/` | 99–100 | 100 | 100 | 100 |
 | `/events/civicforge-24-build-for-the-city/` | 99–100 | 100 | 100 | 100 |
 
-On the live site, mobile runs scored 99 for Performance on `/` and `/events/` (LCP 1.7 s, no blocking time) and 100 for the other three categories. These were run from a development machine; [PageSpeed Insights](https://pagespeed.web.dev) runs the same test from Google's servers, so check there after each deploy.
+On the live site (render72.vercel.app), repeated mobile runs scored 98–100 for Performance (LCP 1.3–1.7 s, CLS 0) and 100 for Accessibility, Best practices and SEO on the home, events and event pages; desktop runs scored 100 across the board. These were run from a development machine; [PageSpeed Insights](https://pagespeed.web.dev) runs the same test from Google's servers, so check there after each deploy.
 
 How it gets there:
 
 - **Static HTML first.** Astro renders every page at build time. There's no UI framework in the browser; the page scripts are a few kilobytes of plain TypeScript.
 - **CSS inlined** into each page, so nothing blocks the first paint.
+- **Off-screen content skips layout** (`content-visibility: auto` on event rows and lower sections). On a 4x slowed CPU this cuts main-thread work on the events page from about 1,045 ms to 643 ms.
+- **Live data waits for the first paint.** Seat-count requests start only after the page has rendered, and updates touch only the numbers that changed.
 - **One preloaded font file** (51 KB, `font-display: swap`) with size-adjusted fallbacks to limit layout shift.
 - **Images served from our own domain** as AVIF and WebP at the right widths, with `srcset`/`sizes`, explicit dimensions, lazy loading below the fold, and a preloaded hero image on event pages. The source photos are on Pexels, whose CDN sets third-party cookies (a Best Practices penalty) and serves much larger files.
 - **The hero's cycling photos** load only after the page has finished loading, pause off-screen, and stop for `prefers-reduced-motion`.
