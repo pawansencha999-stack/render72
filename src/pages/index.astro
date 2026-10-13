@@ -1,0 +1,552 @@
+---
+import Base from '../layouts/Base.astro';
+import Pic from '../components/Pic.astro';
+import { getDataset } from '../lib/api';
+import { toView, overview, type EventView } from '../lib/events';
+import { responsive } from '../lib/images';
+import { fmtDay, fmtTime, fmtRupees, groupIN, fmtDeadline, plural } from '../lib/format';
+
+const ds = await getDataset();
+const views = ds.events.map((e) => toView(e, ds.fetchedAt));
+const ov = overview(views);
+const up = ov.upcoming;
+const firstDay = ov.days[0];
+const lastDay = ov.days[ov.days.length - 1];
+const span =
+  firstDay && lastDay
+    ? `${fmtDay(firstDay, 'weekday')} ${fmtDay(firstDay, 'date').split(' ')[0]} to ${fmtDay(lastDay, 'weekday')} ${fmtDay(lastDay, 'long').split(' ').slice(1).join(' ')}`
+    : 'This season';
+
+// ---- hero: one photo per category, cycling inside the headline ----
+const seen = new Set<string>();
+const slotEvents: EventView[] = [];
+for (const v of [...up.filter((x) => x.e.is_featured), ...up]) {
+  if (slotEvents.length >= 8) break;
+  if (seen.has(v.e.category) || slotEvents.includes(v)) continue;
+  seen.add(v.e.category);
+  slotEvents.push(v);
+}
+const slotImgs = await Promise.all(
+  slotEvents.map((v) => responsive(v.e.cover_image_url, { widths: [300, 600], ratio: [2, 1], quality: 58 })),
+);
+const slot = slotEvents.map((v, i) => ({ v, img: slotImgs[i] })).filter((x) => x.img);
+
+// ---- finder ----
+const byStart = (a: EventView, b: EventView) => a.startMs - b.startMs;
+const moods = [
+  {
+    key: 'soon', label: 'Closing soon', href: '/events/?f=open&sort=deadline',
+    items: up.filter((v) => v.avail.canRegister).sort((a, b) => a.deadlineMs - b.deadlineMs),
+  },
+  { key: 'build', label: 'Build something', href: '/events/?f=tech,competition', items: up.filter((v) => v.kind === 'tech' && v.e.event_type === 'EVENT').sort(byStart) },
+  { key: 'create', label: 'Create or perform', href: '/events/?f=culture,competition', items: up.filter((v) => v.kind === 'culture' && v.e.event_type === 'EVENT').sort(byStart) },
+  { key: 'learn', label: 'Learn a skill', href: '/events/?f=workshop', items: up.filter((v) => v.e.event_type === 'WORKSHOP').sort(byStart) },
+  { key: 'free', label: 'Free to enter', href: '/events/?f=free', items: up.filter((v) => v.e.price === 0).sort(byStart) },
+  { key: 'online', label: 'Join from home', href: '/events/?f=online', items: up.filter((v) => v.online).sort(byStart) },
+].filter((m) => m.items.length);
+
+// ---- organisers' picks ----
+const picks = up.filter((v) => v.e.is_featured).slice(0, 6);
+const grow = [5, 2, 3, 2, 3, 2];
+
+// ---- the weekend, day by day ----
+const weekend = ov.days.slice(0, 4).map((day) => ({
+  day,
+  rows: up
+    .flatMap((v) => v.blocks.filter((b) => b.date === day).map((b) => ({ v, b })))
+    .sort((a, b) => a.b.startMin - b.b.startMin || a.v.title.localeCompare(b.v.title)),
+}));
+const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+const lastBlock = ov.last?.blocks[ov.last.blocks.length - 1];
+const firstVenue = ov.first ? (ov.first.online ? 'online' : `the ${ov.first.venueShort}`) : '';
+const lastVenue = ov.last ? (ov.last.online ? 'online' : `the ${ov.last.venueShort}`) : '';
+
+// ---- close ----
+const nextDeadline = up.filter((v) => v.avail.canRegister).sort((a, b) => a.deadlineMs - b.deadlineMs)[0];
+const perTeam = up.filter((v) => v.e.price > 0 && !v.e.is_per_head && v.e.max_teamsize > 1).length;
+const perHead = up.filter((v) => v.e.price > 0 && (v.e.is_per_head || v.e.max_teamsize <= 1)).length;
+
+const description = `${up.length} club events on campus, ${span}. Compare seats, fees and deadlines, then register before they fill.`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'afterclass',
+  description,
+};
+---
+<Base title={`afterclass · ${up.length} campus events, ${span}`} description={description} current="home" jsonLd={jsonLd}>
+  <!-- HERO -->
+  <section class="hero chapter" data-chapter="paper" aria-labelledby="hero-title">
+    <div class="field" data-chapter="navy" aria-hidden="true"></div>
+    <h1 id="hero-title" class="title display ink-a">
+      <span class="l1">{up.length} events,
+        {slot.length > 0 && (
+          <span class="slot" aria-hidden="true">
+            {slot.map(({ img }, i) => (
+              <picture data-slot={i} class={i === 0 ? 'on' : undefined}>
+                {img!.sources.map((s) => (
+                  i === 0
+                    ? <source type={s.type} srcset={s.srcset} sizes="(min-width: 768px) 22vw, 30vw" />
+                    : <source type={s.type} data-srcset={s.srcset} sizes="(min-width: 768px) 22vw, 30vw" />
+                ))}
+                {i === 0
+                  ? <img src={img!.src} alt="" width={img!.width} height={img!.height} fetchpriority="low" />
+                  : <img data-src={img!.src} alt="" width={img!.width} height={img!.height} />}
+              </picture>
+            ))}
+          </span>
+        )}
+      </span>
+      <span class="l2">one weekend.</span>
+    </h1>
+    <p class="title display ink-b" aria-hidden="true"><span class="l1">&nbsp;</span><span class="l2">one weekend.</span></p>
+    <div class="hero-foot">
+      <p class="lead">{span}. Every club on campus, with seats, fees and deadlines in one place.</p>
+      <a class="button" href="/events/">Browse all events</a>
+    </div>
+  </section>
+
+  <!-- LIVE FIGURES -->
+  <section class="figures chapter" data-chapter="navy" aria-labelledby="figures-title">
+    <div class="wrap fig-grid">
+      <h2 id="figures-title" class="head fig-title" data-reveal>
+        <span class="hot num" data-agg="seatsLeft">{groupIN(ov.seatsLeft)}</span> of <span class="num" data-agg="seatsTotal">{groupIN(ov.seatsTotal)}</span> seats<br />are still open.
+      </h2>
+      <div class="fig-side">
+        <p class="fig-text" data-reveal style="--i:1">
+          Across <b class="num"><span data-agg="openCount">{ov.openCount}</span> events</b> from <b class="num">{ov.clubs} clubs</b>, with <b class="num">{fmtRupees(ov.prizePool)}</b> in prizes for the winners. The counts come straight from the organisers each time you open a page.
+        </p>
+        <div class="live-note" data-live-note data-state="loading" data-reveal style="--i:2">
+          <span class="dot" aria-hidden="true"></span>
+          <span data-live-text role="status">Checking the latest seat counts…</span>
+          <button type="button" data-live-retry hidden>Try again</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINDER -->
+  <section class="finder chapter" data-chapter="paper" aria-labelledby="finder-title">
+    <div class="wrap">
+      <h2 id="finder-title" class="head finder-title" data-reveal>What do you feel like doing this weekend?</h2>
+      <div class="finder-body grid">
+        <fieldset class="moods" data-reveal style="--i:1">
+          <legend class="visually-hidden">Show events for</legend>
+          {moods.map((m, i) => (
+            <label class="chip">
+              <input type="radio" name="mood" value={m.key} id={`mood-${m.key}`} checked={i === 0} />
+              <span>{m.label} <span class="count num">{m.items.length}</span></span>
+            </label>
+          ))}
+        </fieldset>
+        {moods.map((m) => (
+          <div class="panel" data-for={m.key}>
+            <a class="panel-photo" href={m.items[0].href} tabindex="-1" aria-hidden="true">
+              <Pic src={m.items[0].e.cover_image_url} alt="" widths={[320, 480, 720]} ratio={[4, 5]} sizes="(min-width: 900px) 30vw, 50vw" />
+            </a>
+            <ol class="rows plain" role="list" aria-label={`${m.label}: ${plural(m.items.length, 'event')}`}>
+              {m.items.slice(0, 6).map((v) => (
+                <li class="row" data-ev={v.id} data-avail={v.avail.key}>
+                  <span class="when soft num">{fmtDay(v.firstDay)}, {fmtTime(v.e.schedule_summary.start_time)}</span>
+                  <a class="what" href={v.href}><span class="t">{v.title}</span> <span class="sub soft">{v.subtitle}</span></a>
+                  <span class="val num">
+                    {m.key === 'soon'
+                      ? <span>Closes {fmtDeadline(v.e.registration_deadline).split(',')[0]}</span>
+                      : m.key === 'free'
+                        ? <span data-f="seats">{v.avail.seatsText}</span>
+                        : <span>{v.price.amount}</span>}
+                    <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <a class="text-link more" href={m.href}>
+              {m.items.length > 6 ? `See all ${m.items.length}` : 'Open these in the full list'}
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ORGANISERS' PICKS -->
+  {picks.length >= 3 && (
+    <section class="picks chapter" data-chapter="paper" aria-labelledby="picks-title">
+      <div class="wrap">
+        <h2 id="picks-title" class="head picks-title" data-reveal>Picked by the organisers</h2>
+      </div>
+      <ul class="band plain" role="list">
+        {picks.map((v, i) => (
+          <li class="panel-pick" style={`--g:${grow[i] ?? 2}`} data-ev={v.id} data-avail={v.avail.key}>
+            <a href={v.href}>
+              <Pic src={v.e.cover_image_url} alt={v.e.cover_image_alt} widths={[480, 800, 1200]} ratio={[3, 2]} sizes="(min-width: 768px) 60vw, 70vw" />
+              <span class="label">
+                <span class="t">{v.title}</span>
+                <span class="d small num">{v.whenShort}</span>
+                <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p class="wrap band-caption small soft">Chosen by the clubs running them. Point at a photo to look closer, or open it for the full details.</p>
+    </section>
+  )}
+
+  <!-- THE WEEKEND -->
+  <section class="weekend chapter" data-chapter="tone" aria-labelledby="weekend-title">
+    <div class="wrap">
+      <h2 id="weekend-title" class="head" data-reveal>The whole weekend</h2>
+      {ov.first && ov.last && lastBlock && (
+        <p class="lead weekend-lead" data-reveal style="--i:1">
+          It starts at {fmtTime(ov.first.e.schedule_summary.start_time)} on {fmtDay(ov.first.firstDay, 'weekday')} at {firstVenue} and
+          ends at {fmtTime(hm(lastBlock.endMin))} on {fmtDay(lastBlock.date, 'weekday')} at {lastVenue}.
+        </p>
+      )}
+      <div class="days">
+        {weekend.map((d, di) => (
+          <section class="day" aria-labelledby={`day-${d.day}`} data-reveal style={`--i:${di + 1}`}>
+            <h3 id={`day-${d.day}`} class="day-title">
+              <span class="dn">{fmtDay(d.day, 'weekday')}</span>
+              <span class="dd soft">{fmtDay(d.day, 'date')}, {plural(d.rows.length, 'event')}</span>
+            </h3>
+            <ol class="plain" role="list">
+              {d.rows.map(({ v, b }) => (
+                <li data-ev={v.id} data-avail={v.avail.key}>
+                  <span class="tm num">{b.startMin === 0 && v.blocks.some((x) => x.endMin >= 1440 && x.date < b.date) ? `to ${fmtTime(hm(b.endMin))}` : fmtTime(hm(b.startMin))}</span>
+                  <a href={v.href}>{v.title}</a>
+                  <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
+      <p class="weekend-more"><a class="button quiet" href="/events/?view=timetable">Open the timetable</a></p>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how" class="faq chapter" data-chapter="paper" aria-labelledby="faq-title">
+    <div class="wrap">
+      <h2 id="faq-title" class="head" data-reveal>How registration works</h2>
+      <div class="qs">
+        <details>
+          <summary>How do I register for an event?</summary>
+          <p>Open the event, check who can take part and the team size, then press Register before the deadline shown next to it. The organising club confirms your place by email.</p>
+        </details>
+        <details>
+          <summary>Is the fee per person or per team?</summary>
+          <p>Every event says which, right next to the price. A per-team fee covers your whole team ({perTeam} events this weekend work this way); a per-person fee is paid by each member ({perHead} events). {ov.free > 0 ? `${ov.free} events are free.` : ''}</p>
+        </details>
+        <details>
+          <summary>What happens when an event sells out?</summary>
+          <p>It shows as sold out and registration stops. Seat counts on this site are checked against the organisers’ records every time you open a page, so what you see is current.</p>
+        </details>
+        <details>
+          <summary>Can I sign up for more than one event?</summary>
+          <p>Yes, as long as the times don’t overlap. The timetable puts every event of a day side by side, so clashes are easy to spot before you register.</p>
+        </details>
+        <details>
+          <summary>Can students from other colleges take part?</summary>
+          <p>Most events are open to students from any college, and online events can be joined from anywhere. Each event lists its own eligibility; read it before you register.</p>
+        </details>
+        <details>
+          <summary>Who do I ask about a specific event?</summary>
+          <p>Every event page lists its coordinators and how to reach them, along with answers to the questions people ask most.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLOSE -->
+  <section class="close chapter" data-chapter="navy" aria-labelledby="close-title">
+    <div class="wrap">
+      <h2 id="close-title" class="display close-title" data-reveal>
+        {firstDay ? <>See you<br />on {fmtDay(firstDay, 'weekday')}.</> : <>See you at<br />the next one.</>}
+      </h2>
+      <div class="close-foot" data-reveal style="--i:1">
+        <p class="lead">
+          {nextDeadline
+            ? <>Registration closes event by event. The first deadline is {fmtDeadline(nextDeadline.e.registration_deadline)}, for {nextDeadline.title}.</>
+            : <>Registration has closed for this weekend. Past events stay listed with their results.</>}
+        </p>
+        <a class="button" href="/events/">Browse all events</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { startLive } from '../scripts/live';
+  import { startSlot } from '../scripts/slot';
+  startLive();
+  startSlot();
+</script>
+
+<style>
+  /* ---------- hero ---------- */
+  .hero {
+    --seam: 50%;
+    --cut: 1.36em;
+    position: relative;
+    height: calc(100svh - var(--header-h));
+    min-height: 34rem;
+    max-height: 66rem;
+    font-size: clamp(4rem, 1rem + 15vw, 13.5rem);
+    overflow: hidden;
+  }
+  .field {
+    position: absolute;
+    inset: var(--seam) 0 0 0;
+    background: var(--navy);
+  }
+  .title {
+    position: absolute;
+    left: max(var(--margin), (100% - var(--max)) / 2 + var(--margin));
+    right: var(--margin);
+    top: calc(var(--seam) - var(--cut));
+    font-size: 1em;
+    line-height: 0.84;
+    white-space: nowrap;
+    margin: 0;
+    text-wrap: nowrap;
+  }
+  .title .l1, .title .l2 { display: block; }
+  .ink-a { color: var(--navy); clip-path: inset(0 0 calc(100% - var(--cut)) 0); }
+  .ink-b { color: var(--paper); clip-path: inset(var(--cut) 0 0 0); }
+
+  .slot {
+    position: relative;
+    display: inline-block;
+    width: 1.62em;
+    height: 0.64em;
+    margin-left: 0.06em;
+    vertical-align: baseline;
+    overflow: hidden;
+    background: var(--tone);
+  }
+  .slot picture { position: absolute; inset: 0; opacity: 0; transition: opacity 500ms ease; }
+  .slot picture.on { opacity: 1; }
+  .slot img { width: 100%; height: 100%; object-fit: cover; }
+
+  .hero-foot {
+    position: absolute;
+    left: max(var(--margin), (100% - var(--max)) / 2 + var(--margin));
+    right: max(var(--margin), (100% - var(--max)) / 2 + var(--margin));
+    bottom: clamp(2rem, 4.5vh, 3.5rem);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem 3rem;
+    color: var(--paper);
+  }
+  .hero-foot .lead { max-width: 34ch; }
+
+  /* ---------- figures ---------- */
+  .figures { padding-block: clamp(5rem, 12vh, 9rem); }
+  .fig-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 2.5rem var(--gutter); align-items: end; }
+  .fig-title { font-size: var(--fs-head); }
+  .fig-title .hot { color: var(--accent); }
+  .fig-side { display: grid; gap: 1.75rem; padding-bottom: 0.4rem; }
+  .fig-text { font-size: var(--fs-lead); line-height: 1.35; color: var(--on-navy-soft); max-width: 34ch; }
+  .fig-text b { color: var(--paper); font-weight: 600; }
+  .figures .live-note button { color: var(--paper); }
+
+  /* ---------- finder ---------- */
+  .finder { padding-block: var(--section); }
+  .finder-title { max-width: 22ch; text-indent: 3vw; }
+  .finder-body { margin-top: clamp(3rem, 6vw, 6rem); row-gap: 2rem; align-items: start; }
+  .moods {
+    grid-column: 6 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .chip { position: relative; cursor: pointer; }
+  .chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .chip > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.4rem 1rem;
+    background: var(--tone);
+    font-weight: 560;
+    transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  }
+  .chip .count { color: var(--ink-soft); font-weight: 500; }
+  .chip:hover > span { background: var(--tone-2); }
+  .chip input:checked + span { background: var(--navy); color: var(--paper); }
+  .chip input:checked + span .count { color: var(--on-navy-soft); }
+  .chip input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+  .panel { display: none; grid-column: 1 / -1; grid-template-columns: subgrid; row-gap: 1.5rem; }
+  .finder:has(#mood-soon:checked) .panel[data-for='soon'],
+  .finder:has(#mood-build:checked) .panel[data-for='build'],
+  .finder:has(#mood-create:checked) .panel[data-for='create'],
+  .finder:has(#mood-learn:checked) .panel[data-for='learn'],
+  .finder:has(#mood-free:checked) .panel[data-for='free'],
+  .finder:has(#mood-online:checked) .panel[data-for='online'] { display: grid; }
+
+  .panel-photo { grid-column: 1 / 5; grid-row: 1 / 3; align-self: end; }
+  .panel-photo :global(img) { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+  .rows { grid-column: 6 / -1; grid-row: 1; }
+  .row {
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr) auto;
+    gap: 0.25rem 1.25rem;
+    align-items: baseline;
+    padding-block: 0.9rem;
+  }
+  .row + .row { margin-top: 0.15rem; }
+  .row:nth-child(4) { margin-top: 1.4rem; }
+  .row .when { font-size: var(--fs-small); }
+  .row .what { text-decoration: none; font-weight: 600; line-height: 1.25; }
+  .row .what .sub { display: block; font-weight: 400; font-size: var(--fs-small); }
+  .row .what:hover .t { text-decoration: underline; text-underline-offset: 0.18em; }
+  .row .val { text-align: right; display: grid; justify-items: end; gap: 0.2rem; font-size: var(--fs-small); }
+  .more { grid-column: 6 / -1; grid-row: 2; align-self: start; justify-self: start; padding-block: 0.5rem; }
+
+  /* ---------- picks ---------- */
+  .picks { padding-bottom: var(--section); }
+  .picks-title { margin-left: calc(100% / 6); margin-bottom: 4rem; }
+  .band { display: flex; height: 68svh; min-height: 26rem; max-height: 46rem; }
+  .panel-pick {
+    flex: var(--g) 1 0;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+    transition: flex-grow 500ms var(--ease-out);
+  }
+  .panel-pick a { display: block; height: 100%; color: var(--paper); text-decoration: none; }
+  .panel-pick :global(picture), .panel-pick :global(img) { width: 100%; height: 100%; }
+  .panel-pick :global(img) { object-fit: cover; transition: transform 900ms var(--ease-out); }
+  .panel-pick:hover :global(img) { transform: scale(1.04); }
+  .panel-pick .label {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    display: grid;
+    gap: 0.2rem;
+    padding: 1rem 1.1rem 1.1rem;
+    background: var(--navy);
+  }
+  .panel-pick .t {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 720;
+    font-size: var(--fs-lead);
+    line-height: 0.95;
+  }
+  .panel-pick .d { color: var(--on-navy-soft); }
+  .panel-pick .status[data-avail='open'] { color: #8fe0b4; }
+  .panel-pick .status[data-avail='few'] { color: var(--accent); }
+  .panel-pick .status { color: var(--on-navy-soft); }
+  @media (hover: hover) and (min-width: 900px) {
+    .panel-pick:hover, .panel-pick:focus-within { flex-grow: 6; }
+  }
+  .band-caption { margin-top: 1.25rem; }
+
+  /* ---------- weekend ---------- */
+  .weekend { padding-block: var(--section); }
+  .weekend-lead { max-width: 40ch; margin-top: 1.5rem; }
+  .days {
+    margin-top: clamp(3rem, 6vw, 5.5rem);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 5rem var(--gutter);
+  }
+  .day-title { display: grid; gap: 0.25rem; margin-bottom: 1.25rem; }
+  .day-title .dn {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 760;
+    font-size: var(--fs-head);
+    line-height: 0.9;
+  }
+  .day-title .dd { font-size: var(--fs-small); font-weight: 500; }
+  .day li {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding-block: 0.45rem;
+  }
+  .day li + li { margin-top: 0.1rem; }
+  .day .tm { color: var(--ink-soft); font-size: var(--fs-small); }
+  .day a { font-weight: 560; text-decoration: none; line-height: 1.3; }
+  .day a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+  .weekend-more { margin-top: 3.5rem; }
+  .weekend .button.quiet { --bg: var(--paper); }
+  .weekend .button.quiet:hover { --bg: var(--tone-2); }
+
+  /* ---------- faq ---------- */
+  .faq { padding-block: var(--section); }
+  .faq .head { max-width: 14ch; }
+  .qs { margin-top: 4.5rem; margin-left: calc(100% / 3); display: grid; gap: 0.5rem; }
+  .qs details { padding: 0.25rem 1.5rem; margin-inline: -1.5rem; transition: background-color var(--t-ui) ease; }
+  .qs details[open] { background: var(--tone); padding-bottom: 1.5rem; }
+  .qs summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: var(--fs-lead);
+    font-weight: 500;
+    line-height: 1.25;
+    padding-block: 1rem;
+  }
+  .qs summary::-webkit-details-marker { display: none; }
+  .qs summary::after {
+    content: '';
+    width: 0.55em;
+    height: 0.55em;
+    flex: none;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-25%) rotate(45deg);
+    transition: transform var(--t-ui) var(--ease-out);
+  }
+  .qs details[open] summary::after { transform: translateY(15%) rotate(-135deg); }
+  .qs p { max-width: 52ch; }
+
+  /* ---------- close ---------- */
+  .close { padding-block: clamp(6rem, 16vh, 11rem) clamp(4rem, 10vh, 7rem); min-height: 90svh; display: flex; align-items: stretch; }
+  .close .wrap { display: flex; flex-direction: column; justify-content: space-between; gap: 4rem; }
+  .close-title { font-size: clamp(4rem, 1rem + 15vw, 13.5rem); }
+  .close-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem 3rem; }
+  .close-foot .lead { max-width: 36ch; color: var(--on-navy-soft); }
+
+  /* ---------- small screens ---------- */
+  @media (max-width: 900px) {
+    .moods, .rows, .more { grid-column: 1 / -1; }
+    .panel-photo { grid-column: 4 / -1; grid-row: 3; }
+    .rows { grid-row: 1; }
+    .more { grid-row: 2; }
+  }
+  @media (max-width: 760px) {
+    .hero { --seam: 44%; height: calc(90svh - var(--header-h)); min-height: 32rem; font-size: clamp(3.4rem, 0.5rem + 17.5vw, 6rem); }
+    .hero-foot { flex-direction: column; align-items: stretch; }
+    .hero-foot .button { width: 100%; }
+    .fig-grid { grid-template-columns: 1fr; }
+    .finder-title { text-indent: 0; }
+    .row { grid-template-columns: minmax(0, 1fr) auto; }
+    .row .when { grid-column: 1 / -1; }
+    .picks-title { margin-left: 0; margin-bottom: 2rem; }
+    .band { flex-wrap: wrap; height: auto; max-height: none; min-height: 0; }
+    .panel-pick { flex: 0 0 auto; height: 42svh; min-height: 15rem; }
+    .panel-pick:nth-child(4n + 1), .panel-pick:nth-child(4n + 4) { width: 62%; }
+    .panel-pick:nth-child(4n + 2), .panel-pick:nth-child(4n + 3) { width: 38%; }
+    .panel-pick .label { padding: 0.75rem; }
+    .qs { margin-left: 0; }
+    .qs details { margin-inline: calc(-1 * var(--margin)); padding-inline: var(--margin); }
+    .close { min-height: 80svh; }
+    .close-title { font-size: clamp(3.4rem, 0.5rem + 17.5vw, 6rem); }
+    .close-foot { flex-direction: column; align-items: stretch; }
+  }
+</style>

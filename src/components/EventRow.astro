@@ -1,0 +1,123 @@
+---
+import Pic from './Pic.astro';
+import type { EventView } from '../lib/events';
+
+interface Props {
+  v: EventView;
+  home?: string;
+  eager?: boolean;
+  headingLevel?: 'h2' | 'h3';
+}
+const { v, home, eager = false, headingLevel = 'h3' } = Astro.props;
+const H = headingLevel;
+const e = v.e;
+const filters = [
+  v.kind,
+  e.event_type === 'WORKSHOP' ? 'workshop' : 'competition',
+  v.online ? 'online' : 'offline',
+  e.price === 0 ? 'free' : 'paid',
+  v.teamKind === 'solo' ? 'solo' : v.teamKind === 'team' ? 'team' : 'solo team',
+].join(' ');
+---
+<li
+  class="ev"
+  data-ev={v.id}
+  data-avail={v.avail.key}
+  data-open={v.avail.canRegister ? '1' : '0'}
+  data-seats={v.avail.seatsLeft}
+  data-days={v.days.join(' ')}
+  data-past={v.isPast ? '1' : '0'}
+  data-tags={filters}
+  data-start={v.startMs}
+  data-deadline={v.deadlineMs}
+  data-price={e.price}
+  data-home={home}
+  data-search={v.search}
+>
+  <div class="ev-img">
+    <Pic src={e.cover_image_url} alt="" widths={[176, 264, 352]} ratio={[4, 3]} formats={['webp']} sizes="(min-width: 1100px) 176px, (min-width: 700px) 132px, 96px" eager={eager} quality={60} />
+  </div>
+  <div class="ev-when num">
+    <span class="d">{v.whenDate}</span>
+    <span class="t soft">{v.whenTime}</span>
+  </div>
+  <div class="ev-main">
+    <H class="ev-title"><a href={v.href}>{v.title}</a></H>
+    {v.subtitle && <p class="ev-sub">{v.subtitle}</p>}
+    <p class="ev-meta soft small">
+      <span>{e.category}</span>
+      <span>{v.online ? 'Online' : v.venue}</span>
+    </p>
+  </div>
+  <div class="ev-entry">
+    <span class="price num">{v.price.amount}</span>
+    {v.price.unit && <span class="soft small">{v.price.unit}</span>}
+    <span class="soft small">{v.team}</span>
+  </div>
+  <div class="ev-seats">
+    <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
+    <div class="meter" data-f="meter" style={`--fill:${v.avail.fill.toFixed(3)}`} role="presentation"><span></span></div>
+    <span class="small num" data-f="seats">{v.avail.seatsText}</span>
+    {!v.isPast && v.deadline && (
+      <span class="small soft num">Register by {v.deadline} <span data-until={v.deadlineMs} data-past="(closed)"></span></span>
+    )}
+  </div>
+</li>
+
+<style>
+  .ev {
+    position: relative;
+    display: grid;
+    grid-template-columns: 176px 10.5rem minmax(0, 1fr) 9rem 15rem;
+    gap: 1.5rem;
+    align-items: start;
+    padding: 1rem;
+    margin-inline: -1rem;
+    transition: background-color var(--t-hover) ease;
+  }
+  .ev:nth-child(even) { background: #f6f7f9; }
+  .ev:hover { background: var(--tone); }
+  .ev-img :global(img), .ev-img :global(.pic-missing) { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+  .ev-when { display: grid; gap: 0.15rem; padding-top: 0.15rem; }
+  .ev-when .d { font-weight: 600; }
+  .ev-when .t { font-size: var(--fs-small); }
+  .ev-title {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 740;
+    font-size: clamp(1.75rem, 1.3rem + 1vw, 2.25rem);
+    line-height: 0.95;
+  }
+  .ev-title a { text-decoration: none; }
+  /* The title link covers the whole row, so the row is one big target. */
+  .ev-title a::after { content: ''; position: absolute; inset: 0; }
+  .ev:hover .ev-title a { text-decoration: underline; text-decoration-thickness: 0.06em; }
+  .ev-sub { margin-top: 0.3rem; line-height: 1.3; }
+  .ev-meta { display: flex; flex-wrap: wrap; gap: 0.1rem 1rem; margin-top: 0.5rem; }
+  .ev-entry { display: grid; gap: 0.1rem; padding-top: 0.15rem; }
+  .ev-entry .price { font-weight: 650; font-size: 1.25rem; line-height: 1.1; }
+  .ev-seats { display: grid; gap: 0.45rem; padding-top: 0.25rem; }
+  .ev[data-avail='removed'] { opacity: 0.6; }
+
+  @media (max-width: 1180px) {
+    .ev { grid-template-columns: 132px minmax(0, 1fr) 11rem; row-gap: 0.75rem; }
+    .ev-when { grid-column: 2 / -1; grid-row: 1; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .ev-main { grid-column: 2; grid-row: 2; }
+    .ev-img { grid-row: 1 / span 3; }
+    .ev-entry { grid-column: 3; grid-row: 2; }
+    .ev-seats { grid-column: 2 / -1; grid-row: 3; grid-template-columns: auto minmax(6rem, 12rem) auto 1fr; align-items: center; gap: 0.5rem 1rem; }
+  }
+  @media (max-width: 760px) {
+    .ev { grid-template-columns: 96px minmax(0, 1fr); gap: 0.4rem 1rem; padding: 1rem var(--margin); margin-inline: calc(-1 * var(--margin)); }
+    .ev-img { grid-row: 1 / span 2; }
+    .ev-when { grid-column: 2; font-size: var(--fs-small); gap: 0 0.6rem; }
+    .ev-main { grid-column: 2; grid-row: 2; }
+    .ev-entry { grid-column: 1 / -1; grid-row: 3; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.6rem; padding-top: 0.4rem; }
+    .ev-entry .price { font-size: 1.125rem; }
+    .ev-seats { grid-column: 1 / -1; grid-row: 4; grid-template-columns: auto minmax(0, 1fr); gap: 0.35rem 0.75rem; align-items: center; }
+    .ev-seats .meter { grid-column: 1 / -1; grid-row: 2; }
+    .ev-seats [data-f='seats'] { grid-column: 2; grid-row: 1; }
+    .ev-seats > .soft { grid-column: 1 / -1; }
+    .ev-title { font-size: 1.75rem; }
+  }
+</style>

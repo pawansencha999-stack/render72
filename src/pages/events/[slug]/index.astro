@@ -1,0 +1,520 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Pic from '../../../components/Pic.astro';
+import EventRow from '../../../components/EventRow.astro';
+import { getDataset } from '../../../lib/api';
+import { toView, type EventView } from '../../../lib/events';
+import { responsive } from '../../../lib/images';
+import { registerMailto } from '../../../lib/calendar';
+import { fmtDay, fmtTimeRange, fmtRupees, fmtTag, fmtStamp, plural } from '../../../lib/format';
+
+export async function getStaticPaths() {
+  const ds = await getDataset();
+  const views = ds.events.map((e) => toView(e, ds.fetchedAt));
+  return views.map((v) => ({ params: { slug: v.slug }, props: { id: v.id } }));
+}
+
+const { id } = Astro.props as { id: string };
+const ds = await getDataset();
+const views = ds.events.map((e) => toView(e, ds.fetchedAt));
+const v = views.find((x) => x.id === id)!;
+const e = v.e;
+
+const banner = await responsive(e.banner_image_url, { widths: [640, 960, 1280, 1600], ratio: [16, 9], quality: 62 });
+const bannerSizes = '(min-width: 1024px) 56vw, 100vw';
+const avif = banner?.sources.find((s) => s.type === 'image/avif');
+
+const mailto = registerMailto(v);
+const lead = e.coordinators.find((c) => /@/.test(c.contact));
+const paragraphs = e.description.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+const ordinal = (n: number | null) => (n === 1 ? 'First' : n === 2 ? 'Second' : n === 3 ? 'Third' : n ? `${n}th` : 'Special award');
+const prizeTotal = e.prizes.reduce((n, p) => n + p.amount, 0);
+const closedText: Record<string, string> = {
+  soldout: 'Sold out',
+  regclosed: 'Registration closed',
+  closed: 'Closed by the organisers',
+  completed: 'This event has ended',
+};
+
+const related: EventView[] = [
+  ...views.filter((x) => x.id !== v.id && !x.isPast && x.days.some((d) => v.days.includes(d)) && x.kind === v.kind),
+  ...views.filter((x) => x.id !== v.id && !x.isPast && x.days.some((d) => v.days.includes(d)) && x.kind !== v.kind),
+  ...views.filter((x) => x.id !== v.id && !x.isPast && x.kind === v.kind),
+].filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 3);
+
+const sections = [
+  { id: 'about', label: 'About' },
+  { id: 'schedule', label: 'Schedule' },
+  ...(e.prizes.length ? [{ id: 'prizes', label: 'Prizes' }] : []),
+  { id: 'entry', label: 'Who can enter' },
+  ...(e.rules.length ? [{ id: 'rules', label: 'Rules' }] : []),
+  ...(e.faqs.length ? [{ id: 'questions', label: 'Questions' }] : []),
+  { id: 'contact', label: 'Contact' },
+];
+
+const pageUrl = Astro.site ? new URL(v.href, Astro.site).href : v.href;
+const iso = (d: string, t: string) => `${d}T${t === '23:59' ? '23:59' : t}:00+05:30`;
+const ss = e.schedule_summary;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Event',
+  name: e.name,
+  description: e.blurb,
+  startDate: iso(ss.start_date, ss.start_time),
+  endDate: iso(ss.end_date, ss.end_time),
+  eventStatus: e.event_status === 'CLOSED' ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
+  eventAttendanceMode: v.online ? 'https://schema.org/OnlineEventAttendanceMode' : 'https://schema.org/OfflineEventAttendanceMode',
+  location: v.online
+    ? { '@type': 'VirtualLocation', url: pageUrl }
+    : { '@type': 'Place', name: v.venue, address: v.venue },
+  image: banner && Astro.site ? [new URL(banner.src, Astro.site).href] : undefined,
+  organizer: e.organizers.map((o) => ({ '@type': 'Organization', name: o.name })),
+  offers: {
+    '@type': 'Offer',
+    price: e.price,
+    priceCurrency: 'INR',
+    availability: v.avail.key === 'soldout' ? 'https://schema.org/SoldOut' : v.avail.canRegister ? 'https://schema.org/InStock' : 'https://schema.org/Discontinued',
+    validThrough: e.registration_deadline,
+    url: pageUrl,
+  },
+};
+---
+<Base
+  title={`${e.name} · ${v.whenDate} · afterclass`}
+  description={`${e.blurb} ${v.whenDate}, ${v.whenTime}, ${v.online ? 'online' : v.venue}. ${v.price.short}${v.price.short === 'Free' ? ' entry' : ''}.`}
+  image={banner?.src}
+  imageAlt={e.banner_image_alt}
+  current="events"
+  jsonLd={jsonLd}
+  preloadImage={avif ? { srcset: avif.srcset, sizes: bannerSizes, type: 'image/avif' } : undefined}
+>
+  <article class="event" data-ev={v.id} data-avail={v.avail.key} data-event-page>
+    <div class="removed-note wrap" data-removed-note hidden role="alert">
+      <p><strong>This event is no longer listed.</strong> The organisers have taken it down. The details below are from {fmtStamp(ds.fetchedAt)} and registration is closed. <a class="text-link" href="/events/">See all events</a></p>
+    </div>
+
+    <section class="top chapter" data-chapter="paper" aria-labelledby="ev-title">
+      <div class="wrap top-grid">
+        <nav class="crumbs small" aria-label="Breadcrumb">
+          <ol class="plain" role="list">
+            <li><a href="/events/">All events</a></li>
+            <li><a href={`/events/?q=${encodeURIComponent(e.category.toLowerCase())}`}>{e.category}</a></li>
+            <li><span aria-current="page">{v.title}</span></li>
+          </ol>
+        </nav>
+
+        <header class="head-block">
+          <h1 id="ev-title" class="display ev-title">{v.title}</h1>
+          {v.subtitle && <p class="lead ev-sub">{v.subtitle}</p>}
+          <p class="ev-blurb">{e.blurb}</p>
+        </header>
+
+        <figure class="banner">
+          {banner ? (
+            <picture>
+              {banner.sources.map((s) => <source type={s.type} srcset={s.srcset} sizes={bannerSizes} />)}
+              <img src={banner.src} alt={e.banner_image_alt} width={banner.width} height={banner.height} sizes={bannerSizes} fetchpriority="high" decoding="sync" />
+            </picture>
+          ) : (
+            <div class="pic-missing" role="img" aria-label={e.banner_image_alt}><span>Photo unavailable</span></div>
+          )}
+        </figure>
+
+        <aside class="facts" aria-label="Key details">
+          <dl>
+            <div class="f">
+              <dt>When</dt>
+              <dd><span class="big">{v.whenDate}</span><span class="num">{v.whenTime}</span></dd>
+            </div>
+            <div class="f">
+              <dt>Where</dt>
+              <dd><span class="big">{v.online ? 'Online' : v.venueShort}</span>{!v.online && v.venue.includes(',') && <span>{v.venue.slice(v.venue.indexOf(',') + 1).trim()}</span>}{v.online && <span>Link shared with registered participants</span>}</dd>
+            </div>
+            <div class="f">
+              <dt>Entry</dt>
+              <dd><span class="big num">{v.price.amount}{v.price.unit && <span class="unit"> {v.price.unit}</span>}</span><span>{v.team}</span></dd>
+            </div>
+            <div class="f seats">
+              <dt>Seats</dt>
+              <dd>
+                <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
+                <div class="meter" data-f="meter" style={`--fill:${v.avail.fill.toFixed(3)}`} role="presentation"><span></span></div>
+                <span class="num" data-f="seats">{v.avail.seatsText}</span>
+              </dd>
+            </div>
+            {!v.isPast && (
+              <div class="f">
+                <dt>Register by</dt>
+                <dd><span class="num">{v.deadline}</span> <span class="soft num" data-until={v.deadlineMs} data-past="(deadline passed)"></span></dd>
+              </div>
+            )}
+          </dl>
+
+          <div class="actions">
+            {mailto ? (
+              v.avail.canRegister
+                ? <a class="button register" href={mailto} data-f="register" data-label="Register">Register</a>
+                : <span class="button register" data-f="register" data-href={mailto} data-label="Register" aria-disabled="true">{closedText[v.avail.key] ?? 'Registration closed'}</span>
+            ) : (
+              <span class="button register" aria-disabled="true">Registration details coming soon</span>
+            )}
+            {lead && <p class="small soft reg-note">Register opens an email to {lead.name}, {lead.role.toLowerCase()}, with the details they need already listed.</p>}
+            <div class="secondary">
+              <a class="button quiet small-btn" href={`${v.href}calendar.ics`} download={`${v.slug}.ics`}>Add to calendar</a>
+              <button type="button" class="button quiet small-btn" data-share data-title={e.name} data-url={v.href}>Share</button>
+            </div>
+            <p class="small soft share-msg" data-share-msg role="status"></p>
+          </div>
+
+          <div class="live-note" data-live-note data-state="loading">
+            <span class="dot" aria-hidden="true"></span>
+            <span data-live-text role="status">Checking the latest seat counts…</span>
+            <button type="button" data-live-retry hidden>Try again</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <nav class="on-page" aria-label="On this page">
+      <div class="wrap">
+        <ul class="plain" role="list">
+          {sections.map((s) => <li><a href={`#${s.id}`}>{s.label}</a></li>)}
+        </ul>
+      </div>
+    </nav>
+
+    <div class="wrap body">
+      <section id="about" class="block" aria-labelledby="h-about">
+        <h2 id="h-about" class="head h2">About</h2>
+        <div class="cols">
+          <div class="prose measure">{paragraphs.map((p) => <p>{p}</p>)}</div>
+          <div class="side-lists">
+            {e.highlights.length > 0 && (
+              <div>
+                <h3 class="h3">Highlights</h3>
+                <ul class="ticks">{e.highlights.map((h) => <li>{h}</li>)}</ul>
+              </div>
+            )}
+            {e.what_to_expect.length > 0 && (
+              <div>
+                <h3 class="h3">On the day</h3>
+                <ol class="steps">{e.what_to_expect.map((h) => <li>{h}</li>)}</ol>
+              </div>
+            )}
+          </div>
+        </div>
+        {e.tags.length > 0 && (
+          <ul class="tags plain" role="list" aria-label="Topics">
+            {e.tags.map((t) => <li><a href={`/events/?q=${encodeURIComponent(fmtTag(t).toLowerCase())}`}>{fmtTag(t)}</a></li>)}
+          </ul>
+        )}
+      </section>
+
+      <section id="schedule" class="block" aria-labelledby="h-schedule">
+        <h2 id="h-schedule" class="head h2">Schedule</h2>
+        <table class="sched">
+          <caption class="visually-hidden">Sessions, in Indian Standard Time</caption>
+          <thead><tr><th scope="col">Day</th><th scope="col">Time</th><th scope="col">Venue</th></tr></thead>
+          <tbody>
+            {e.schedules.map((s) => (
+              <tr>
+                <th scope="row">{fmtDay(s.event_date, 'long')}</th>
+                <td class="num">{fmtTimeRange(s.start_time, s.end_time)}</td>
+                <td>{v.online ? 'Online' : s.venue}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p class="small soft">All times are Indian Standard Time.</p>
+      </section>
+
+      {e.prizes.length > 0 && (
+        <section id="prizes" class="block chapter prizes" data-chapter="navy" aria-labelledby="h-prizes">
+          <h2 id="h-prizes" class="head h2">Prizes <span class="soft total num">{fmtRupees(prizeTotal)} in total</span></h2>
+          <ol class="prize-list plain" role="list">
+            {e.prizes.map((p) => (
+              <li>
+                <span class="rank">{ordinal(p.rank)}</span>
+                <span class="amt num">{fmtRupees(p.amount)}</span>
+                <span class="pt">{p.title}</span>
+                <span class="pd">{p.description}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <section id="entry" class="block" aria-labelledby="h-entry">
+        <h2 id="h-entry" class="head h2">Who can enter</h2>
+        <div class="two">
+          <div>
+            <h3 class="h3">Eligibility</h3>
+            <ul class="ticks">{e.eligibility.map((x) => <li>{x}</li>)}</ul>
+            <p class="team-line"><strong>{v.team}.</strong> {v.price.amount === 'Free' ? 'Free to enter.' : `${v.price.amount} ${v.price.unit}.`}</p>
+          </div>
+          {e.prerequisites.length > 0 && (
+            <div>
+              <h3 class="h3">Bring or know beforehand</h3>
+              <ul class="ticks">{e.prerequisites.map((x) => <li>{x}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {e.rules.length > 0 && (
+        <section id="rules" class="block" aria-labelledby="h-rules">
+          <h2 id="h-rules" class="head h2">Rules</h2>
+          <ol class="rules">{e.rules.map((r) => <li>{r}</li>)}</ol>
+        </section>
+      )}
+
+      {e.gallery_images.length > 0 && (
+        <section class="block gallery" aria-label="Photos">
+          {e.gallery_images.slice(0, 2).map((g, i) => (
+            <Pic src={g} alt={`${v.title}: photo ${i + 1}`} widths={[480, 800, 1200]} ratio={i === 0 ? [4, 3] : [3, 4]} formats={['webp']} sizes="(min-width: 900px) 45vw, 100vw" />
+          ))}
+        </section>
+      )}
+
+      {e.faqs.length > 0 && (
+        <section id="questions" class="block" aria-labelledby="h-q">
+          <h2 id="h-q" class="head h2">Questions</h2>
+          <div class="qs">
+            {e.faqs.map((f, i) => (
+              <details open={i === 0}>
+                <summary>{f.question}</summary>
+                <p>{f.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section id="contact" class="block" aria-labelledby="h-contact">
+        <h2 id="h-contact" class="head h2">Contact</h2>
+        <div class="contacts">
+          {e.organizers.map((o) => (
+            <div class="org">
+              <p class="small soft">Organised by</p>
+              <p class="org-name">{o.name}</p>
+            </div>
+          ))}
+          {e.coordinators.map((c) => (
+            <div class="person">
+              <p class="pn">{c.name}</p>
+              <p class="small soft">{c.role}</p>
+              {/@/.test(c.contact)
+                ? <a class="text-link" href={`mailto:${c.contact}`}>{c.contact}</a>
+                : <span>{c.contact}</span>}
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    {related.length > 0 && (
+      <section class="related chapter" data-chapter="tone" aria-labelledby="h-related">
+        <div class="wrap">
+          <h2 id="h-related" class="head h2">More {fmtDay(v.firstDay, 'weekday')} events</h2>
+          <ul class="rows plain" role="list">
+            {related.map((r) => <EventRow v={r} />)}
+          </ul>
+          <p><a class="button quiet" href="/events/">See all {plural(views.filter((x) => !x.isPast).length, 'event')}</a></p>
+        </div>
+      </section>
+    )}
+
+    <div class="mobile-bar" aria-hidden="false">
+      <div class="mb-text">
+        <span class="num mb-price">{v.price.amount}{v.price.unit && <span class="soft small"> {v.price.unit}</span>}</span>
+        <span class="small num" data-f="seats">{v.avail.seatsText}</span>
+      </div>
+      {mailto && (
+        v.avail.canRegister
+          ? <a class="button" href={mailto} data-f="register" data-label="Register">Register</a>
+          : <span class="button" data-f="register" data-href={mailto} data-label="Register" aria-disabled="true">{closedText[v.avail.key] ?? 'Closed'}</span>
+      )}
+    </div>
+  </article>
+</Base>
+
+<script>
+  import { startLive } from '../../../scripts/live';
+  import { startEventDetail } from '../../../scripts/event-page';
+  startLive();
+  startEventDetail();
+</script>
+
+<style>
+  .removed-note { padding-block: 1rem; background: var(--tone); margin-top: 1rem; }
+
+  .top { padding-block: clamp(1.5rem, 3vw, 2.5rem) clamp(3rem, 6vw, 5rem); }
+  .top-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--gutter);
+    row-gap: 2rem;
+    align-items: start;
+  }
+  .crumbs { grid-column: 1 / -1; }
+  .crumbs ol { display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; }
+  .crumbs li + li::before { content: '/'; margin-right: 0.6rem; color: var(--ink-soft); }
+  .crumbs a { color: var(--ink-soft); text-decoration: none; }
+  .crumbs a:hover { color: var(--ink); text-decoration: underline; }
+  .head-block { grid-column: 1 / 8; display: grid; gap: 1rem; }
+  .ev-title { font-size: clamp(3.5rem, 1rem + 7.4vw, 8.5rem); }
+  .ev-sub { font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.25rem); font-weight: 500; line-height: 1.15; max-width: 28ch; }
+  .ev-blurb { max-width: 52ch; }
+  .banner { grid-column: 1 / 8; }
+  .banner img, .banner .pic-missing { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+  .pic-missing { display: grid; place-items: center; background: var(--tone); color: var(--ink-soft); }
+
+  .facts {
+    grid-column: 9 / -1;
+    grid-row: 2 / span 2;
+    position: sticky;
+    top: calc(var(--header-h) + 1.5rem);
+    display: grid;
+    gap: 1.5rem;
+    background: var(--tone);
+    padding: clamp(1.25rem, 2vw, 2rem);
+  }
+  .facts dl { display: grid; gap: 0; }
+  .f { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; padding-block: 0.7rem; }
+  .f dt { color: var(--ink-soft); font-size: 0.9375rem; padding-top: 0.2rem; }
+  .f dd { display: grid; gap: 0.15rem; }
+  .f .big { font-weight: 650; font-size: 1.25rem; line-height: 1.2; }
+  .f .big .unit { font-weight: 450; font-size: var(--fs-body); }
+  .seats dd { gap: 0.45rem; }
+  .actions { display: grid; gap: 0.75rem; }
+  .register { width: 100%; min-height: 3.75rem; font-size: 1.1875rem; }
+  .reg-note { max-width: 40ch; }
+  .secondary { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .secondary .button { flex: 1; }
+  .facts .button.quiet { --bg: var(--paper); }
+  .facts .button.quiet:hover { --bg: var(--tone-2); }
+  .share-msg:empty { display: none; }
+
+  .on-page {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 10;
+    background: var(--navy);
+    color: var(--paper);
+  }
+  .on-page ul { display: flex; gap: 0.25rem 1.75rem; overflow-x: auto; scrollbar-width: none; }
+  .on-page a {
+    display: flex;
+    align-items: center;
+    min-height: 3.25rem;
+    white-space: nowrap;
+    text-decoration: none;
+    font-weight: 540;
+    color: var(--on-navy-soft);
+    position: relative;
+  }
+  .on-page a:hover, .on-page a[aria-current='true'] { color: var(--paper); }
+  .on-page a[aria-current='true']::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--accent);
+  }
+  .on-page { --focus: var(--paper); }
+
+  .body { padding-bottom: var(--section); }
+  .block { padding-top: clamp(4rem, 8vw, 7rem); scroll-margin-top: calc(var(--header-h) + 3.25rem); }
+  .h2 { font-size: clamp(2.5rem, 1.6rem + 3vw, 4.5rem); margin-bottom: clamp(1.5rem, 3vw, 2.5rem); }
+  .h3 { font-size: 1.1875rem; font-weight: 650; margin-bottom: 0.75rem; }
+  .cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 3rem var(--gutter); }
+  .prose { font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem); line-height: 1.55; }
+  .side-lists { display: grid; gap: 2.5rem; align-content: start; }
+  .ticks, .steps, .rules { padding-left: 1.25rem; display: grid; gap: 0.6rem; }
+  .ticks li::marker { color: var(--accent-press); }
+  .steps li::marker, .rules li::marker { font-weight: 650; }
+  .rules { max-width: 70ch; gap: 0.9rem; }
+  .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 2.5rem; }
+  .tags a {
+    display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0.25rem 0.85rem;
+    background: var(--tone); text-decoration: none; font-weight: 520; font-size: 0.9375rem;
+  }
+  .tags a:hover { background: var(--tone-2); }
+
+  .sched { width: 100%; max-width: 60rem; border-collapse: collapse; margin-bottom: 0.75rem; }
+  .sched th, .sched td { text-align: left; padding: 0.9rem 1rem 0.9rem 0; vertical-align: top; }
+  .sched thead th { font-size: var(--fs-small); color: var(--ink-soft); font-weight: 500; padding-bottom: 0.5rem; }
+  .sched tbody tr { border-top: 2px solid var(--tone); }
+  .sched tbody th { font-weight: 600; }
+
+  .prizes {
+    margin-top: clamp(4rem, 8vw, 7rem);
+    padding: clamp(2.5rem, 5vw, 4rem) var(--margin);
+    margin-inline: calc(-1 * var(--margin));
+  }
+  .prizes .total { font-size: 0.4em; font-family: var(--font); font-stretch: 100%; font-weight: 500; letter-spacing: 0; margin-left: 0.5rem; }
+  .prize-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 2rem var(--gutter); }
+  .prize-list li { display: grid; gap: 0.35rem; align-content: start; }
+  .prize-list .rank { color: var(--on-navy-soft); font-size: 0.9375rem; }
+  .prize-list .amt {
+    font-family: var(--font-display); font-stretch: 75%; font-weight: 760;
+    font-size: clamp(3rem, 2rem + 3vw, 5rem); line-height: 0.9; color: var(--accent);
+  }
+  .prize-list .pt { font-weight: 650; font-size: 1.1875rem; }
+  .prize-list .pd { color: var(--on-navy-soft); max-width: 40ch; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem var(--gutter); max-width: 76rem; }
+  .team-line { margin-top: 1.25rem; }
+
+  .gallery { display: grid; grid-template-columns: 7fr 5fr; gap: var(--gutter); align-items: end; }
+  .gallery :global(img) { width: 100%; height: auto; object-fit: cover; }
+
+  .qs { display: grid; gap: 0.25rem; max-width: 60rem; }
+  .qs details { padding: 0.25rem 1.25rem; margin-inline: -1.25rem; }
+  .qs details[open] { background: var(--tone); padding-bottom: 1.25rem; }
+  .qs summary {
+    list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; align-items: center;
+    font-size: 1.25rem; font-weight: 520; padding-block: 0.9rem; line-height: 1.3;
+  }
+  .qs summary::-webkit-details-marker { display: none; }
+  .qs summary::after {
+    content: ''; width: 0.5em; height: 0.5em; flex: none; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    transform: translateY(-25%) rotate(45deg); transition: transform var(--t-ui) var(--ease-out);
+  }
+  .qs details[open] summary::after { transform: translateY(15%) rotate(-135deg); }
+  .qs p { max-width: 62ch; }
+
+  .contacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 2rem var(--gutter); }
+  .org-name, .pn { font-weight: 650; font-size: 1.25rem; }
+  .person { display: grid; gap: 0.2rem; justify-items: start; }
+
+  .related { padding-block: var(--section); }
+  .related .rows { margin-bottom: 3rem; }
+  .related .rows :global(.ev:nth-child(even)) { background: transparent; }
+  .related .rows :global(.ev:hover) { background: var(--tone-2); }
+  .related .button.quiet { --bg: var(--paper); }
+
+  .mobile-bar { display: none; }
+
+  @media (max-width: 1023px) {
+    .head-block, .banner, .facts { grid-column: 1 / -1; }
+    .facts { grid-row: auto; position: static; }
+    .cols, .two, .gallery { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .f { grid-template-columns: 6rem minmax(0, 1fr); }
+    .ev-title { font-size: clamp(3.25rem, 1rem + 13vw, 5rem); }
+    .mobile-bar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem var(--margin) calc(0.6rem + env(safe-area-inset-bottom));
+      background: var(--paper);
+      box-shadow: 0 -10px 30px -12px rgba(15, 22, 40, 0.35); /* taste-skill-ignore: fixed action bar floats over content */
+      transform: translateY(110%);
+      transition: transform var(--t-ui) var(--ease-out);
+    }
+    .mobile-bar.show { transform: none; }
+    .mobile-bar .button { flex: none; }
+    .mb-text { display: grid; line-height: 1.25; }
+    .mb-price { font-weight: 650; font-size: 1.125rem; }
+    .body { padding-bottom: 6rem; }
+    .prizes { padding-inline: var(--margin); }
+    .qs details { margin-inline: calc(-1 * var(--margin)); padding-inline: var(--margin); }
+  }
+</style>

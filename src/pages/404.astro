@@ -1,0 +1,93 @@
+---
+import Base from '../layouts/Base.astro';
+import { getDataset } from '../lib/api';
+import { toView } from '../lib/events';
+
+const ds = await getDataset();
+const views = ds.events.map((e) => toView(e, ds.fetchedAt));
+// Event ids → page addresses, so links that use an API id (/events/<id>/) still land on the right page.
+const byId = Object.fromEntries(views.map((v) => [v.id, v.href]));
+---
+<Base title="Page not found · afterclass" description="There is no page at this address. Browse all campus events instead." noindex>
+  <section class="nf chapter" data-chapter="paper" aria-labelledby="nf-title">
+    <div class="wrap">
+      <h1 id="nf-title" class="display nf-title" data-nf-title>Nothing here.</h1>
+      <div class="nf-body" data-nf-body>
+        <p class="lead">There is no page at this address. The link may be mistyped, or the event may have been taken down by its organisers.</p>
+        <p class="actions">
+          <a class="button" href="/events/">Browse all events</a>
+          <a class="button quiet" href="/">Go to the home page</a>
+        </p>
+      </div>
+      <div class="nf-found" data-nf-found hidden>
+        <p class="lead" data-nf-text></p>
+        <dl class="nf-facts" data-nf-facts></dl>
+        <p class="actions"><a class="button" href="/events/">Browse all events</a></p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script is:inline type="application/json" id="nf-map" set:html={JSON.stringify(byId)}></script>
+<script>
+  import { fetchEvent } from '../scripts/live';
+  import { fmtDay, fmtTimeRange, fmtPrice } from '../lib/format';
+
+  const m = location.pathname.match(/\/events\/([0-9a-f-]{36})\/?$/i);
+  if (m) {
+    const id = m[1].toLowerCase();
+    const map = JSON.parse(document.getElementById('nf-map')?.textContent || '{}') as Record<string, string>;
+    if (map[id]) {
+      location.replace(map[id]);
+    } else {
+      // An id we didn't build a page for: ask the API whether it exists.
+      const title = document.querySelector<HTMLElement>('[data-nf-title]')!;
+      const body = document.querySelector<HTMLElement>('[data-nf-body]')!;
+      const found = document.querySelector<HTMLElement>('[data-nf-found]')!;
+      const text = document.querySelector<HTMLElement>('[data-nf-text]')!;
+      const facts = document.querySelector<HTMLElement>('[data-nf-facts]')!;
+      title.textContent = 'Looking it up…';
+      fetchEvent(id)
+        .then((ev) => {
+          if (!ev) {
+            title.textContent = 'No such event.';
+            return;
+          }
+          const s = ev.schedule_summary ?? {};
+          title.textContent = String(ev.name ?? 'Event').split(':')[0];
+          text.textContent = `${ev.blurb ?? ''} This event was added after this site was last updated, so here are the essentials from the events service.`;
+          const rows: [string, string][] = [
+            ['When', s.start_date ? `${fmtDay(s.start_date)}, ${fmtTimeRange(s.start_time, s.end_time)}` : 'To be announced'],
+            ['Where', ev.event_mode === 'ONLINE' ? 'Online' : ev.schedules?.[0]?.venue ?? 'On campus'],
+            ['Entry', fmtPrice(ev.price ?? 0, !!ev.is_per_head, ev.max_teamsize ?? 1).short],
+          ];
+          facts.replaceChildren(
+            ...rows.flatMap(([k, v]) => {
+              const dt = document.createElement('dt');
+              dt.textContent = k;
+              const dd = document.createElement('dd');
+              dd.textContent = v;
+              return [dt, dd];
+            }),
+          );
+          body.hidden = true;
+          found.hidden = false;
+        })
+        .catch(() => {
+          title.textContent = 'Can’t check right now.';
+          const p = body.querySelector('p');
+          if (p) p.textContent = 'This looks like an event link, but the events service is not responding. Try again in a minute, or browse the events we already have.';
+        });
+    }
+  }
+</script>
+
+<style>
+  .nf { padding-block: clamp(4rem, 12vh, 9rem) var(--section); min-height: 70svh; }
+  .nf-title { font-size: clamp(4.5rem, 1rem + 12vw, 12rem); margin-bottom: 2rem; }
+  .nf .lead { max-width: 44ch; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+  .nf-facts { display: grid; grid-template-columns: 6rem 1fr; gap: 0.5rem 1rem; margin-top: 1.5rem; max-width: 36rem; }
+  .nf-facts :global(dt) { color: var(--ink-soft); }
+  .nf-facts :global(dd) { font-weight: 600; }
+</style>

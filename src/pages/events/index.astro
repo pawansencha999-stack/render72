@@ -1,0 +1,330 @@
+---
+import Base from '../../layouts/Base.astro';
+import EventRow from '../../components/EventRow.astro';
+import Timetable from '../../components/Timetable.astro';
+import { getDataset } from '../../lib/api';
+import { toView, overview } from '../../lib/events';
+import { fmtDay, plural } from '../../lib/format';
+
+const ds = await getDataset();
+const views = ds.events.map((e) => toView(e, ds.fetchedAt));
+const ov = overview(views);
+const days = ov.days;
+const groups = days.map((day) => ({ day, items: ov.upcoming.filter((v) => v.firstDay === day) }));
+const span = days.length
+  ? `${fmtDay(days[0], 'weekday')} ${fmtDay(days[0], 'date').split(' ')[0]} to ${fmtDay(days[days.length - 1], 'long')}`
+  : '';
+
+const filterGroups = [
+  { name: 'avail', label: 'Availability', options: [{ v: 'open', l: 'Open for registration' }] },
+  { name: 'cost', label: 'Cost', options: [{ v: 'free', l: 'Free' }] },
+  { name: 'kind', label: 'Kind', options: [{ v: 'tech', l: 'Technical' }, { v: 'culture', l: 'Cultural' }] },
+  { name: 'type', label: 'Format', options: [{ v: 'competition', l: 'Competitions' }, { v: 'workshop', l: 'Workshops' }] },
+  { name: 'mode', label: 'Where', options: [{ v: 'offline', l: 'On campus' }, { v: 'online', l: 'Online' }] },
+  { name: 'team', label: 'Entry', options: [{ v: 'solo', l: 'Solo' }, { v: 'team', l: 'Teams' }] },
+];
+
+const title = `All events, ${span} · afterclass`;
+const description = `Every club event on campus: ${ov.upcoming.length} upcoming, ${span}. Search and filter by day, kind, price and seats left, or plan your weekend on the timetable.`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Upcoming campus events',
+  itemListElement: ov.upcoming.map((v, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    url: Astro.site ? new URL(v.href, Astro.site).href : v.href,
+    name: v.e.name,
+  })),
+};
+let eagerCount = 0;
+---
+<Base title={title} description={description} current="events" jsonLd={jsonLd}>
+  <section class="intro chapter" data-chapter="paper" aria-labelledby="page-title">
+    <div class="wrap intro-grid">
+      <h1 id="page-title" class="display page-title">All events</h1>
+      <div class="intro-side">
+        <p class="lead">
+          {plural(ov.upcoming.length, 'event')}, {span}. Filter them, or use the timetable to plan around clashes.
+        </p>
+        <div class="live-note" data-live-note data-state="loading">
+          <span class="dot" aria-hidden="true"></span>
+          <span data-live-text role="status">Checking the latest seat counts…</span>
+          <button type="button" data-live-retry hidden>Try again</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <form class="controls" id="controls" role="search" aria-label="Find events">
+    <div class="wrap">
+      <div class="row-a">
+        <label class="search">
+          <span class="visually-hidden">Search events</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg>
+          <input type="search" name="q" placeholder="Search events, clubs, venues"
+            aria-keyshortcuts="/" autocomplete="off" enterkeyhint="search" />
+        </label>
+        <fieldset class="seg view" aria-label="View">
+          <legend class="visually-hidden">View</legend>
+          <label><input type="radio" name="view" value="list" checked /><span>List</span></label>
+          <label><input type="radio" name="view" value="timetable" /><span>Timetable</span></label>
+        </fieldset>
+        <button type="button" class="toggle-filters" aria-expanded="false" aria-controls="filter-panel">
+          Filters <span class="fcount num" data-fcount hidden></span>
+        </button>
+      </div>
+
+      <fieldset class="seg days" aria-label="Day">
+        <legend class="visually-hidden">Day</legend>
+        <label><input type="radio" name="day" value="all" checked /><span>All upcoming</span></label>
+        {days.map((d) => (
+          <label><input type="radio" name="day" value={d} /><span>{fmtDay(d)}</span></label>
+        ))}
+        {ov.past.length > 0 && <label><input type="radio" name="day" value="past" /><span>Already happened</span></label>}
+      </fieldset>
+
+      <div class="filter-panel" id="filter-panel">
+        <div class="chips">
+          {filterGroups.map((g) => (
+            <fieldset class="chip-group">
+              <legend class="visually-hidden">{g.label}</legend>
+              {g.options.map((o) => (
+                <label class="chip"><input type="checkbox" name={g.name} value={o.v} /><span>{o.l}</span></label>
+              ))}
+            </fieldset>
+          ))}
+        </div>
+        <label class="sort">
+          <span>Sort by</span>
+          <select name="sort">
+            <option value="date">Date and time</option>
+            <option value="deadline">Registration deadline</option>
+            <option value="seats">Fewest seats left</option>
+            <option value="price">Price, lowest first</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </form>
+
+  <section class="results" aria-labelledby="results-count">
+    <div class="wrap">
+      <div class="results-bar">
+        <p id="results-count" class="count" aria-live="polite" aria-atomic="true">Showing {plural(ov.upcoming.length, 'upcoming event')}</p>
+        <button type="button" class="text-link clear" data-clear hidden>Clear all filters</button>
+      </div>
+
+      <div class="list-view" data-view-panel="list">
+        {groups.map((g) => (
+          <section class="group" data-group={g.day} aria-labelledby={`g-${g.day}`}>
+            <h2 id={`g-${g.day}`} class="group-title">
+              <span class="dn">{fmtDay(g.day, 'long')}</span>
+              <span class="gc soft" data-group-count>{plural(g.items.length, 'event')}</span>
+            </h2>
+            <ul class="rows plain" role="list">
+              {g.items.map((v) => <EventRow v={v} home={g.day} eager={eagerCount++ < 2} />)}
+            </ul>
+          </section>
+        ))}
+        {ov.past.length > 0 && (
+          <section class="group past" data-group="past" aria-labelledby="g-past" hidden>
+            <h2 id="g-past" class="group-title">
+              <span class="dn">Already happened</span>
+              <span class="gc soft" data-group-count>{plural(ov.past.length, 'event')}</span>
+            </h2>
+            <ul class="rows plain" role="list">
+              {ov.past.map((v) => <EventRow v={v} home="past" />)}
+            </ul>
+          </section>
+        )}
+        <section class="group flat" data-group="flat" aria-labelledby="g-flat" hidden>
+          <h2 id="g-flat" class="group-title"><span class="dn" data-flat-title>Results</span></h2>
+          <ul class="rows plain" role="list" data-flat></ul>
+        </section>
+      </div>
+
+      <div class="tt-view" data-view-panel="timetable" hidden>
+        <p class="tt-help soft small">Each bar is one event, placed by its start and end time. Events that overlap sit on separate rows, so you can see clashes at a glance. Filters dim the events they leave out.</p>
+        <Timetable views={ov.upcoming} days={days} />
+        <p class="tt-past soft" hidden>The timetable shows upcoming events. Switch to the list to browse events that already happened.</p>
+      </div>
+
+      <div class="empty" data-empty hidden>
+        <p class="head">Nothing matches.</p>
+        <p class="lead">No events fit every filter you picked. Remove one, or start again.</p>
+        <button type="button" class="button" data-clear>Clear all filters</button>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { startLive } from '../../scripts/live';
+  import { startEventsPage } from '../../scripts/events-page';
+  startEventsPage();
+  startLive();
+</script>
+
+<style>
+  .intro { padding-block: clamp(2rem, 4vw, 3.5rem) clamp(1.25rem, 2vw, 2rem); }
+  .intro-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.5rem 4rem; align-items: end; }
+  .page-title { font-size: clamp(3.75rem, 1rem + 6.4vw, 7.5rem); }
+  .intro-side { display: grid; gap: 1rem; max-width: 46ch; padding-bottom: 0.6rem; }
+
+  /* ---- controls ---- */
+  .controls { background: var(--paper); padding-block: 1rem; }
+  html:not(.js) .controls { display: none; }
+  @media (min-width: 1024px) {
+    .controls { position: sticky; top: var(--header-h); z-index: 20; }
+    .controls.stuck { box-shadow: 0 12px 24px -18px rgba(15, 22, 40, 0.5); } /* taste-skill-ignore: sticky bar floats over the list */
+  }
+  .row-a { display: flex; gap: 0.75rem; align-items: stretch; flex-wrap: wrap; }
+  .search {
+    flex: 1 1 18rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 3.25rem;
+    padding-inline: 1rem;
+    background: var(--tone);
+    border-bottom: 2px solid transparent;
+    transition: border-color var(--t-hover) ease;
+  }
+  .search:focus-within { border-bottom-color: var(--navy); }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    font-size: 1.0625rem;
+    padding-block: 0.6rem;
+    outline: none;
+  }
+  .search input::placeholder { color: var(--ink-soft); opacity: 1; }
+  .search input::-webkit-search-cancel-button { cursor: pointer; }
+
+  .seg { display: flex; flex-wrap: nowrap; gap: 0.25rem; border: 0; padding: 0; margin: 0; min-inline-size: 0; min-width: 0; }
+  .seg label { position: relative; cursor: pointer; flex: none; }
+  .seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .seg span {
+    display: flex;
+    align-items: center;
+    min-height: 3.25rem;
+    padding-inline: 1.1rem;
+    background: var(--tone);
+    font-weight: 560;
+    white-space: nowrap;
+    transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  }
+  .seg label:hover span { background: var(--tone-2); }
+  .seg input:checked + span { background: var(--navy); color: var(--paper); }
+  .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .days { margin-top: 0.75rem; overflow-x: auto; scrollbar-width: none; }
+  .days span { min-height: 2.75rem; }
+
+  .toggle-filters {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3.25rem;
+    padding-inline: 1.1rem;
+    border: 0;
+    background: var(--tone);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .toggle-filters[aria-expanded='true'] { background: var(--navy); color: var(--paper); }
+  .fcount { background: var(--accent); color: var(--navy); min-width: 1.5rem; padding: 0 0.35rem; text-align: center; }
+
+  .filter-panel { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem 2rem; margin-top: 0.75rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+  .chip-group { display: flex; flex-wrap: wrap; gap: 0.25rem; border: 0; padding: 0; margin: 0; min-inline-size: 0; }
+  .chip { position: relative; cursor: pointer; }
+  .chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .chip span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.85rem;
+    background: var(--tone);
+    font-weight: 540;
+    font-size: 0.9875rem;
+    transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  }
+  .chip:hover span { background: var(--tone-2); }
+  .chip input:checked + span { background: var(--navy); color: var(--paper); }
+  .chip input:checked + span::before {
+    content: '';
+    width: 0.35em;
+    height: 0.7em;
+    margin: -0.15em 0.15em 0 0.05em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+  }
+  .chip input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .sort { display: flex; align-items: center; gap: 0.6rem; font-weight: 560; }
+  .controls[data-view='timetable'] .sort { visibility: hidden; }
+  .sort select {
+    min-height: 2.75rem;
+    padding: 0.35rem 2.25rem 0.35rem 0.85rem;
+    border: 0;
+    border-radius: 0;
+    background: var(--tone) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231f2b4d' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 0.85rem center;
+    appearance: none;
+    font-weight: 540;
+    cursor: pointer;
+  }
+
+  /* ---- results ---- */
+  .results { padding-bottom: var(--section); }
+  .results-bar { display: flex; align-items: baseline; gap: 1.5rem; padding-block: 1.25rem 0; }
+  .count { font-weight: 560; }
+  .clear { background: none; border: 0; padding: 0.25rem 0; cursor: pointer; color: var(--ink); font-size: 1rem; }
+
+  .group { margin-top: 1.75rem; }
+  .group-title {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    padding-bottom: 0.75rem;
+    position: sticky;
+    top: var(--header-h);
+    background: var(--paper);
+    z-index: 5;
+    padding-top: 0.5rem;
+  }
+  @media (min-width: 1024px) { .group-title { position: static; } }
+  .group-title .dn {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 760;
+    font-size: clamp(2rem, 1.4rem + 1.8vw, 3.25rem);
+    line-height: 0.95;
+  }
+  .group-title .gc { font-size: 1rem; font-weight: 500; }
+
+  .tt-help { max-width: 70ch; margin: 1rem 0 2.5rem; }
+
+  .empty { padding-block: 4rem; display: grid; gap: 1rem; justify-items: start; }
+
+  @media (max-width: 760px) {
+    .intro-grid { grid-template-columns: 1fr; }
+    .page-title { font-size: clamp(4rem, 1rem + 15vw, 6rem); }
+    .toggle-filters { display: inline-flex; }
+    .row-a .search { flex-basis: 100%; }
+    .view { flex: 1; }
+    .view label { flex: 1; }
+    .view span { justify-content: center; }
+    .filter-panel { display: none; flex-direction: column; align-items: stretch; padding: 1rem 0 0.5rem; }
+    .filter-panel.open { display: flex; }
+    .sort { justify-content: space-between; }
+    .sort select { flex: 1; }
+    .days { margin-inline: calc(-1 * var(--margin)); padding-inline: var(--margin); }
+  }
+</style>

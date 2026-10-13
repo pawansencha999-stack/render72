@@ -1,0 +1,60 @@
+---
+import { getDataset } from '../lib/api';
+import { fmtStamp } from '../lib/format';
+const ds = await getDataset();
+const year = new Date(ds.fetchedAt).getFullYear();
+---
+<footer class="site-footer chapter" data-chapter="navy">
+  <div class="wrap">
+    <div class="notes small">
+      <p>Every club event on campus, in one place.</p>
+      <p>Event details come from the Render72 Events API. This build was made on {fmtStamp(ds.fetchedAt)}; seat counts refresh live in your browser.</p>
+      <p>Event photographs are from Pexels, supplied with each event.</p>
+      <a class="top text-link" href="#main">Back to top</a>
+    </div>
+    <p class="name wordmark" aria-hidden="true">afterclass</p>
+    <div class="meta small">
+      <nav aria-label="Footer">
+        <a href="/events/">All events</a>
+        <a href="/events/?view=timetable">Timetable</a>
+        <a href="/#how">How it works</a>
+      </nav>
+      <p>Built by Pawan for Render72, a CORE Lab frontend and design hackathon. Set in Anek Latin by Ek Type.</p>
+      <p>{year}</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer { padding-block: clamp(2.5rem, 5vw, 4rem) 1.5rem; }
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 18rem)) 1fr;
+    gap: 1rem var(--gutter);
+    color: var(--on-navy-soft);
+  }
+  .notes p { max-width: 34ch; }
+  .top { justify-self: end; align-self: start; color: var(--paper); }
+  .name {
+    font-size: clamp(5rem, 31.2vw, 31rem);
+    line-height: 0.8;
+    letter-spacing: -0.02em;
+    margin: clamp(4rem, 14vw, 12rem) 0 1.75rem -0.04em;
+    white-space: nowrap;
+  }
+  .meta {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr auto;
+    gap: 1rem var(--gutter);
+    color: var(--on-navy-soft);
+  }
+  .meta nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+  .meta a { color: var(--paper); text-decoration: none; font-weight: 550; padding-block: 0.35rem; }
+  .meta a:hover { text-decoration: underline; }
+  .meta p:last-child { text-align: right; }
+  @media (max-width: 760px) {
+    .notes, .meta { grid-template-columns: 1fr; }
+    .top { justify-self: start; }
+    .meta p:last-child { text-align: left; }
+  }
+</style>

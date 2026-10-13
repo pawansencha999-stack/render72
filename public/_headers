@@ -1,0 +1,17 @@
+# Cloudflare Pages / Netlify response headers.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  X-Frame-Options: SAMEORIGIN
+  Cross-Origin-Opener-Policy: same-origin
+
+# Hashed build output and the font never change: cache for a year.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+/events/*/calendar.ics
+  Content-Type: text/calendar; charset=utf-8
+  Content-Disposition: attachment

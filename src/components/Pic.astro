@@ -1,0 +1,50 @@
+---
+import { responsive, type Format } from '../lib/images';
+
+interface Props {
+  src: string | undefined;
+  alt: string;
+  widths: number[];
+  sizes: string;
+  ratio?: [number, number];
+  formats?: Format[];
+  eager?: boolean;
+  priority?: boolean;
+  class?: string;
+  quality?: number;
+}
+
+const { src, alt, widths, sizes, ratio = [3, 2], formats, eager = false, priority = false, class: cls, quality } = Astro.props;
+const img = await responsive(src, { widths, ratio, formats, quality });
+const w = img?.width ?? widths[0];
+const h = img?.height ?? Math.round((widths[0] * ratio[1]) / ratio[0]);
+---
+{img ? (
+  <picture class={cls}>
+    {img.sources.map((s) => <source type={s.type} srcset={s.srcset} sizes={sizes} />)}
+    <img
+      src={img.src}
+      alt={alt}
+      width={w}
+      height={h}
+      sizes={sizes}
+      loading={eager || priority ? 'eager' : 'lazy'}
+      decoding={priority ? 'sync' : 'async'}
+      fetchpriority={priority ? 'high' : undefined}
+    />
+  </picture>
+) : (
+  <div class:list={[cls, 'pic-missing']} role="img" aria-label={alt} style={`aspect-ratio:${ratio[0]}/${ratio[1]}`}>
+    <span>Photo unavailable</span>
+  </div>
+)}
+
+<style>
+  .pic-missing {
+    display: grid;
+    place-items: center;
+    background: var(--tone);
+    color: var(--ink-soft);
+    font-size: var(--fs-small);
+  }
+</style>

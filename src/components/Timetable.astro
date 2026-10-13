@@ -1,0 +1,171 @@
+---
+import type { EventView } from '../lib/events';
+import { fmtDay, fmtTime, fmtTimeRange } from '../lib/format';
+
+interface Props { views: EventView[]; days: string[] }
+const { views, days } = Astro.props;
+
+const hm = (min: number) => `${String(Math.floor(Math.min(min, 1439) / 60)).padStart(2, '0')}:${String(Math.min(min, 1439) % 60).padStart(2, '0')}`;
+const label = (min: number) => (min >= 1440 ? 'midnight' : fmtTime(hm(min)));
+
+const timetable = days.map((day) => {
+  const bars = views
+    .flatMap((v) => v.blocks.filter((b) => b.date === day).map((b) => ({
+      v,
+      b,
+      // A session that starts at midnight right after one that ran until midnight is a continuation.
+      cont: b.startMin === 0 && v.blocks.some((x) => x.date < day && x.endMin >= 1440),
+    })))
+    .sort((a, b) => a.b.startMin - b.b.startMin || b.b.endMin - a.b.endMin);
+  const own = bars.filter((x) => !x.cont);
+  const h0 = Math.max(0, Math.floor(Math.min(...(own.length ? own : bars).map((x) => x.b.startMin)) / 60));
+  const h1 = Math.min(24, Math.ceil(Math.max(...bars.map((x) => x.b.endMin)) / 60));
+  // Greedy lanes so overlapping events sit on separate rows.
+  const laneEnds: number[] = [];
+  const placed = bars.map((x) => {
+    const s = Math.max(x.b.startMin, h0 * 60);
+    let lane = laneEnds.findIndex((end) => end <= s);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(0); }
+    laneEnds[lane] = x.b.endMin;
+    return { ...x, s, lane };
+  });
+  return { day, placed, lanes: laneEnds.length, h0, h1 };
+});
+---
+<div class="tt-wrap">
+  {timetable.map((t) => (
+    <section class="tt-day" data-day={t.day} aria-labelledby={`tt-${t.day}`}>
+      <h2 id={`tt-${t.day}`} class="tt-title">
+        <span class="dn">{fmtDay(t.day, 'weekday')}</span>
+        <span class="dd soft">{fmtDay(t.day, 'date')}, {t.placed.length} events from {fmtTime(hm(t.h0 * 60))} to {label(t.h1 * 60)}</span>
+      </h2>
+      <div class="tt-scroll" tabindex="0" role="region" aria-label={`${fmtDay(t.day, 'long')} timetable. Scroll sideways to see the whole day.`}>
+        <div class="tt" style={`--h0:${t.h0};--hours:${t.h1 - t.h0};--lanes:${t.lanes}`} data-day={t.day}>
+          <div class="tt-hours" aria-hidden="true">
+            {Array.from({ length: t.h1 - t.h0 }, (_, i) => (
+              <span style={`--i:${i}`}>{fmtTime(hm((t.h0 + i) * 60))}</span>
+            ))}
+          </div>
+          <div class="tt-now" aria-hidden="true" hidden></div>
+          <ol class="tt-bars plain" role="list">
+            {t.placed.map(({ v, b, s, lane, cont }) => (
+              <li
+                class="tt-ev"
+                data-ev={v.id}
+                data-avail={v.avail.key}
+                data-open={v.avail.canRegister ? '1' : '0'}
+                data-days={v.days.join(' ')}
+                data-past="0"
+                data-tags={[v.kind, v.e.event_type === 'WORKSHOP' ? 'workshop' : 'competition', v.online ? 'online' : 'offline', v.e.price === 0 ? 'free' : 'paid', v.teamKind === 'solo' ? 'solo' : v.teamKind === 'team' ? 'team' : 'solo team'].join(' ')}
+                data-search={v.search}
+                style={`--s:${s};--e:${b.endMin};--lane:${lane}`}
+              >
+                <a href={v.href}>
+                  <span class="n">{v.title}</span>
+                  <span class="m num">{cont ? `Continues, until ${label(b.endMin)}` : fmtTimeRange(hm(b.startMin), b.endMin >= 1440 ? '23:59' : hm(b.endMin))}</span>
+                  <span class="visually-hidden">, {v.online ? 'online' : b.venue}, </span>
+                  <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
+  ))}
+</div>
+
+<style>
+  .tt-day + .tt-day { margin-top: 4rem; }
+  .tt-title { display: grid; gap: 0.25rem; margin-bottom: 1.25rem; }
+  .tt-title .dn {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 760;
+    font-size: clamp(2.25rem, 1.5rem + 2vw, 3.5rem);
+    line-height: 0.9;
+  }
+  .tt-title .dd { font-size: 1rem; font-weight: 500; }
+
+  .tt-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    margin-inline: calc(-1 * var(--margin));
+    padding-inline: var(--margin);
+    scrollbar-width: thin;
+  }
+  .tt-scroll:focus-visible { outline-offset: -3px; }
+
+  .tt {
+    --lane-h: 5.25rem;
+    --span: calc(var(--hours) * 60);
+    position: relative;
+    min-width: max(100%, calc(var(--hours) * 4.75rem));
+    padding-top: 2.25rem;
+    height: calc(2.25rem + var(--lanes) * var(--lane-h) + 0.5rem);
+  }
+  /* Hour columns are shown as alternating tone bands rather than ruled lines. */
+  .tt-hours span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--i) / var(--hours) * 100%);
+    width: calc(100% / var(--hours));
+    padding: 0.35rem 0.5rem;
+    font-size: var(--fs-small);
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .tt-hours span:nth-child(odd) { background: var(--tone); }
+
+  .tt-now {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    left: calc((var(--now) - var(--h0) * 60) / var(--span) * 100%);
+    z-index: 2;
+  }
+
+  .tt-ev {
+    position: absolute;
+    top: calc(2.25rem + var(--lane) * var(--lane-h) + 0.25rem);
+    left: calc((var(--s) - var(--h0) * 60) / var(--span) * 100% + 2px);
+    width: calc((var(--e) - var(--s)) / var(--span) * 100% - 4px);
+    height: calc(var(--lane-h) - 0.5rem);
+    transition: opacity var(--t-ui) ease;
+  }
+  .tt-ev a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    height: 100%;
+    padding: 0.5rem 0.65rem;
+    background: var(--navy);
+    color: var(--paper);
+    text-decoration: none;
+    overflow: hidden;
+    transition: background-color var(--t-hover) ease;
+  }
+  .tt-ev a:hover { background: var(--navy-2); }
+  .tt-ev a > * { flex: none; }
+  .tt-ev .n { font-weight: 620; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tt-ev .m { font-size: 0.8125rem; color: var(--on-navy-soft); white-space: nowrap; }
+  .tt-ev .status { font-size: 0.8125rem; margin-top: 0.1rem; }
+  .tt-ev .status { color: var(--on-navy-soft); }
+  .tt-ev .status[data-avail='open'] { color: #8fe0b4; }
+  .tt-ev .status[data-avail='few'] { color: var(--accent); }
+  /* Events you can no longer join turn pale, with dark text so they stay readable. */
+  .tt-ev:is([data-avail='soldout'], [data-avail='regclosed'], [data-avail='closed'], [data-avail='removed']) a {
+    background: var(--tone-2);
+    color: var(--navy);
+  }
+  .tt-ev:is([data-avail='soldout'], [data-avail='regclosed'], [data-avail='closed'], [data-avail='removed']) .m,
+  .tt-ev:is([data-avail='soldout'], [data-avail='regclosed'], [data-avail='closed'], [data-avail='removed']) .status {
+    color: var(--ink-soft);
+  }
+  .tt-ev.dim { opacity: 0.18; }
+  .tt-ev.dim a { pointer-events: none; }
+</style>
