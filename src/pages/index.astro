@@ -92,7 +92,7 @@ const jsonLd = {
                 data-id={v.id}
                 data-title={v.title}
                 data-sub={v.subtitle}
-                data-when={`${fmtDay(v.firstDay, 'long')}, ${v.whenTime}`}
+                data-when={v.days.length > 1 ? `${v.whenDate}, ${v.whenTime}` : `${fmtDay(v.firstDay, 'long')}, ${v.whenTime}`}
                 data-where={v.online ? 'online' : `at the ${v.venueShort}`}
                 data-href={v.href}
               >
