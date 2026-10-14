@@ -12,7 +12,7 @@ const year = new Date(ds.fetchedAt).getFullYear();
       <p>Event photographs are from Pexels, supplied with each event.</p>
       <a class="top text-link" href="#main">Back to top</a>
     </div>
-    <p class="name wordmark" aria-hidden="true">afterclass</p>
+    <p class="name wordmark" aria-hidden="true" data-bell title="Ring the bell">afterclass</p>
     <div class="meta small">
       <nav aria-label="Footer">
         <a href="/events/">All events</a>
@@ -41,7 +41,10 @@ const year = new Date(ds.fetchedAt).getFullYear();
     letter-spacing: -0.02em;
     margin: clamp(4rem, 14vw, 12rem) 0 1.75rem -0.04em;
     white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--t-hover) ease;
   }
+  .name:hover { color: var(--accent); }
   .meta {
     display: grid;
     grid-template-columns: 1fr 1.4fr auto;

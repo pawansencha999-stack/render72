@@ -3,6 +3,7 @@
 
 export function startChrome() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  startEasterEggs();
 
   // Reveals
   const items = document.querySelectorAll<HTMLElement>('[data-reveal]');
@@ -57,4 +58,34 @@ export function startChrome() {
   window.addEventListener('scroll', schedule, { passive: true });
   window.addEventListener('resize', schedule, { passive: true });
   update();
+}
+
+// ---- easter eggs ------------------------------------------------------------
+
+function startEasterEggs() {
+  // A note for anyone who opens the developer tools.
+  console.log(
+    '%cafterclass%c\nBuilt for Render72 with Astro: static HTML, about 20 KB of JavaScript, live seat counts.\nTwo things to try: click the photo in the home page headline, and type this site\'s name anywhere.',
+    'font: 800 28px/1.2 "Anek Latin", sans-serif; font-stretch: 75%; color: #f7941d; background: #1f2b4d; padding: 4px 10px;',
+    'font: 14px/1.5 sans-serif; color: inherit;',
+  );
+
+  const bell = () => import('./bell').then((m) => m.classDismissed());
+
+  // Type "afterclass" anywhere (outside form fields) and the bell rings.
+  const word = 'afterclass';
+  let typed = '';
+  document.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key.length !== 1) return;
+    typed = (typed + e.key.toLowerCase()).slice(-word.length);
+    if (typed === word) {
+      typed = '';
+      bell();
+    }
+  });
+
+  // Or click the big wordmark in the footer.
+  document.querySelectorAll<HTMLElement>('[data-bell]').forEach((el) => el.addEventListener('click', bell));
 }

@@ -26,6 +26,15 @@ The data describes one campus fest weekend: 27 events across Friday 13 to Sunday
 - **Shapes:** square corners everywhere, and no drop shadows except on things that genuinely float (the sticky filter bar, the phone action bar, the menu).
 - **Data-heavy screens:** the events list reads like a timetable. Each row has the same columns (photo, when, what, entry fee and team size, seats left with a meter, register-by date), so events can be compared by scanning down. On phones each row restacks into a compact card.
 
+## Easter eggs
+
+Two, both built from the page's own design rather than bolted on:
+
+- **The photo in the headline is a slot machine.** Click it (or Tab to it and press Enter). It spins through the weekend's events, slows down and deals you one that still has seats, and the hero offers you that event, with its live seat count. Spin again, or go back.
+- **The site answers to its name.** Type `afterclass` anywhere, or click the giant wordmark in the footer. A school bell rings (synthesised with Web Audio, no sound file) and the hero's navy field rises over the screen: *Class dismissed.*
+
+Both respect `prefers-reduced-motion`, and the bell's code is only downloaded when it's triggered. There's also a note in the browser console.
+
 ## Built to survive API downtime
 
 The site never depends on the API being up at the moment someone visits.
