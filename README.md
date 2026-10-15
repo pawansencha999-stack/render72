@@ -35,6 +35,18 @@ Two, both built from the page's own design rather than bolted on:
 
 Both respect `prefers-reduced-motion`, and the bell's code is only downloaded when it's triggered. There's also a note in the browser console.
 
+## Motion
+
+The motion is built from the same pieces as the design (the navy field, the split headline, the photos) and costs nothing on load: it is CSS, plus about 2 KB of script that starts after the first paint.
+
+- **Page transitions.** Moving between pages cross-fades, and an event's photo grows from the list, the picks or the related events into the event page's banner. These are CSS view transitions, with no JavaScript; browsers without them simply load the page.
+- **The hero.** The navy field rises on load and the white half of the headline appears with it. With a mouse, the two lines sit at different depths and shift against each other, and the photo moves inside its frame like a window. As you scroll away, the lines slide apart. The slot machine's photos flip in like a split-flap departure board.
+- **Seats running out.** A ticker under the live seat count scrolls the events with the fewest seats left, with live numbers. It stops while you point at it or tab into it, and has a Pause button.
+- **Pointer effects.** Event photos tilt towards the pointer in 3D and zoom inside their frames, buttons lean towards the pointer and sweep to a second colour, and timetable blocks lift with a tangerine rule. In the finder, pointing at an event shows its photo; those photos load only when needed.
+- **Scroll effects.** Seat meters fill as they appear, photos in the picks band drift, day and section headings rise in, and the footer wordmark's letters rise out of the bottom of the page one by one (and wave when you point at them). These are scroll-driven CSS animations, so they run off the main thread.
+
+Everything that moves is animated with `transform` and `opacity` only, so nothing causes layout shift or main-thread layout work. Pointer effects are attached only for a mouse or trackpad. With `prefers-reduced-motion`, all of it is off: the ticker becomes a list you can scroll sideways.
+
 ## Built to survive API downtime
 
 The site never depends on the API being up at the moment someone visits.
@@ -82,7 +94,7 @@ The site is static files on a CDN, so visitor count barely affects it. The brows
 
 ## Accessibility
 
-Semantic landmarks and headings, a skip link, real buttons, radios and checkboxes behind every control, and visible focus styles. Result counts and live status are announced politely to screen readers. The timetable scroll area is keyboard focusable, and the FAQs use `<details>`. Text meets WCAG AA contrast. Motion respects `prefers-reduced-motion`, and every page works without JavaScript; only the filters need it.
+Semantic landmarks and headings, a skip link, real buttons, radios and checkboxes behind every control, and visible focus styles. Result counts and live status are announced politely to screen readers. The timetable scroll area is keyboard focusable, and the FAQs use `<details>`. Text meets WCAG AA contrast. Motion respects `prefers-reduced-motion`, the moving ticker can be paused (and stops on hover or focus), and every page works without JavaScript; only the filters need it.
 
 ## SEO
 
@@ -125,7 +137,9 @@ src/
   lib/          api.ts (build-time fetch + fallback), events.ts (view models),
                 format.ts (IST dates, ₹, team sizes), availability.ts, images.ts, calendar.ts
   scripts/      live.ts (live seats, cache, retry), events-page.ts (search/filter/sort/URL),
-                event-page.ts, slot.ts (hero photos), chrome.ts (header colour, reveals)
+                event-page.ts, slot.ts (hero photos, slot machine), chrome.ts (header colour,
+                reveals, easter eggs), bell.ts ("Class dismissed"), motion.ts (tilt, magnetic
+                buttons, hero depth, ticker, finder previews)
   components/   Header, Footer, EventRow, Timetable, Pic
   pages/        index, events/index, events/[slug]/index + calendar.ics, 404, robots.txt, sitemap.xml
   data/         snapshot.json (offline fallback)

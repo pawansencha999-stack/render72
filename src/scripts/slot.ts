@@ -86,14 +86,20 @@ export function startSlot() {
   hit.title = 'Spin';
   hit.setAttribute('aria-label', 'Spin the slot machine: deal me a random event I can still join');
   hero.appendChild(hit);
+  // Measured from layout offsets, not getBoundingClientRect: the headline moves with the pointer,
+  // the scroll and its intro animation, and the button carries the same transforms in CSS.
   const place = () => {
-    const h = hero.getBoundingClientRect();
-    const r = slot.getBoundingClientRect();
+    let x = 0;
+    let y = 0;
+    for (let n: HTMLElement | null = slot; n && n !== hero; n = n.offsetParent as HTMLElement | null) {
+      x += n.offsetLeft;
+      y += n.offsetTop;
+    }
     Object.assign(hit.style, {
-      left: `${r.left - h.left}px`,
-      top: `${r.top - h.top}px`,
-      width: `${r.width}px`,
-      height: `${r.height}px`,
+      left: `${x}px`,
+      top: `${y}px`,
+      width: `${slot.offsetWidth}px`,
+      height: `${slot.offsetHeight}px`,
     });
   };
   place();

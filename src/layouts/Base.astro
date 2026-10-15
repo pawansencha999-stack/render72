@@ -60,7 +60,9 @@ const ogImage = image && site ? new URL(image, site).href : undefined;
     <Footer />
     <script>
       import { startChrome } from '../scripts/chrome';
+      import { startMotion } from '../scripts/motion';
       startChrome();
+      startMotion();
     </script>
   </body>
 </html>

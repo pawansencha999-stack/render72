@@ -147,9 +147,31 @@ const timetable = days.map((day) => {
     color: var(--paper);
     text-decoration: none;
     overflow: hidden;
-    transition: background-color var(--t-hover) ease;
+    position: relative;
+    transition: background-color var(--t-hover) ease, transform 320ms var(--ease-out), box-shadow 320ms var(--ease-out);
+  }
+  /* A tangerine rule runs along the bottom of the block you point at, and the block lifts. */
+  .tt-ev a::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 3px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 380ms var(--ease-out);
   }
   .tt-ev a:hover { background: var(--navy-2); }
+  .tt-ev a:hover::after, .tt-ev a:focus-visible::after { transform: scaleX(1); }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .tt-ev:hover { z-index: 3; }
+    .tt-ev a:hover { transform: translateY(-3px); box-shadow: 0 14px 24px -14px rgba(15, 22, 40, 0.6); } /* taste-skill-ignore: lifts only under the pointer */
+  }
+  /* Blocks slide in along the time axis, lane by lane, when the timetable is opened. */
+  @media (prefers-reduced-motion: no-preference) {
+    .tt-ev { animation: tt-in 600ms var(--ease-out) backwards; animation-delay: calc(var(--lane) * 70ms + 60ms); }
+  }
+  @keyframes tt-in { from { opacity: 0; translate: -1.5rem 0; } }
   .tt-ev a > * { flex: none; }
   .tt-ev .n { font-weight: 620; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tt-ev .m { font-size: 0.8125rem; color: var(--on-navy-soft); white-space: nowrap; }

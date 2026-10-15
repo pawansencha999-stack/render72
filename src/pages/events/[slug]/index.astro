@@ -3,7 +3,7 @@ import Base from '../../../layouts/Base.astro';
 import Pic from '../../../components/Pic.astro';
 import EventRow from '../../../components/EventRow.astro';
 import { getDataset } from '../../../lib/api';
-import { toView, type EventView } from '../../../lib/events';
+import { toView, vtName, type EventView } from '../../../lib/events';
 import { responsive } from '../../../lib/images';
 import { registerMailto } from '../../../lib/calendar';
 import { fmtDay, fmtTimeRange, fmtRupees, fmtTag, fmtStamp, plural } from '../../../lib/format';
@@ -109,9 +109,9 @@ const jsonLd = {
           <p class="ev-blurb">{e.blurb}</p>
         </header>
 
-        <figure class="banner">
+        <figure class="banner" data-tilt data-tilt-max="3">
           {banner ? (
-            <picture>
+            <picture class="vt-photo" style={`view-transition-name:${vtName(v.id)}`}>
               {banner.sources.map((s) => <source type={s.type} srcset={s.srcset} sizes={bannerSizes} />)}
               <img src={banner.src} alt={e.banner_image_alt} width={banner.width} height={banner.height} sizes={bannerSizes} fetchpriority="high" decoding="sync" />
             </picture>
@@ -185,7 +185,7 @@ const jsonLd = {
 
     <div class="wrap body">
       <section id="about" class="block defer" aria-labelledby="h-about">
-        <h2 id="h-about" class="head h2">About</h2>
+        <h2 id="h-about" class="head h2 wipe">About</h2>
         <div class="cols">
           <div class="prose measure">{paragraphs.map((p) => <p>{p}</p>)}</div>
           <div class="side-lists">
@@ -211,7 +211,7 @@ const jsonLd = {
       </section>
 
       <section id="schedule" class="block defer" aria-labelledby="h-schedule">
-        <h2 id="h-schedule" class="head h2">Schedule</h2>
+        <h2 id="h-schedule" class="head h2 wipe">Schedule</h2>
         <table class="sched">
           <caption class="visually-hidden">Sessions, in Indian Standard Time</caption>
           <thead><tr><th scope="col">Day</th><th scope="col">Time</th><th scope="col">Venue</th></tr></thead>
@@ -230,7 +230,7 @@ const jsonLd = {
 
       {e.prizes.length > 0 && (
         <section id="prizes" class="block chapter prizes defer" data-chapter="navy" aria-labelledby="h-prizes">
-          <h2 id="h-prizes" class="head h2">Prizes <span class="soft total num">{fmtRupees(prizeTotal)} in total</span></h2>
+          <h2 id="h-prizes" class="head h2 wipe">Prizes <span class="soft total num">{fmtRupees(prizeTotal)} in total</span></h2>
           <ol class="prize-list plain" role="list">
             {e.prizes.map((p) => (
               <li>
@@ -245,7 +245,7 @@ const jsonLd = {
       )}
 
       <section id="entry" class="block defer" aria-labelledby="h-entry">
-        <h2 id="h-entry" class="head h2">Who can enter</h2>
+        <h2 id="h-entry" class="head h2 wipe">Who can enter</h2>
         <div class="two">
           <div>
             <h3 class="h3">Eligibility</h3>
@@ -263,7 +263,7 @@ const jsonLd = {
 
       {e.rules.length > 0 && (
         <section id="rules" class="block defer" aria-labelledby="h-rules">
-          <h2 id="h-rules" class="head h2">Rules</h2>
+          <h2 id="h-rules" class="head h2 wipe">Rules</h2>
           <ol class="rules">{e.rules.map((r) => <li>{r}</li>)}</ol>
         </section>
       )}
@@ -278,7 +278,7 @@ const jsonLd = {
 
       {e.faqs.length > 0 && (
         <section id="questions" class="block defer" aria-labelledby="h-q">
-          <h2 id="h-q" class="head h2">Questions</h2>
+          <h2 id="h-q" class="head h2 wipe">Questions</h2>
           <div class="qs">
             {e.faqs.map((f, i) => (
               <details open={i === 0}>
@@ -291,7 +291,7 @@ const jsonLd = {
       )}
 
       <section id="contact" class="block defer" aria-labelledby="h-contact">
-        <h2 id="h-contact" class="head h2">Contact</h2>
+        <h2 id="h-contact" class="head h2 wipe">Contact</h2>
         <div class="contacts">
           {e.organizers.map((o) => (
             <div class="org">
@@ -315,7 +315,7 @@ const jsonLd = {
     {related.length > 0 && (
       <section class="related chapter defer" data-chapter="tone" aria-labelledby="h-related">
         <div class="wrap">
-          <h2 id="h-related" class="head h2">More {fmtDay(v.firstDay, 'weekday')} events</h2>
+          <h2 id="h-related" class="head h2 wipe">More {fmtDay(v.firstDay, 'weekday')} events</h2>
           <ul class="rows plain" role="list">
             {related.map((r) => <EventRow v={r} />)}
           </ul>

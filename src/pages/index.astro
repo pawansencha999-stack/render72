@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Pic from '../components/Pic.astro';
 import { getDataset } from '../lib/api';
-import { toView, overview, type EventView } from '../lib/events';
+import { toView, overview, vtName, type EventView } from '../lib/events';
 import { responsive } from '../lib/images';
 import { fmtDay, fmtTime, fmtRupees, groupIN, fmtDeadline, plural } from '../lib/format';
 
@@ -47,6 +47,22 @@ const moods = [
   { key: 'free', label: 'Free to enter', href: '/events/?f=free', items: up.filter((v) => v.e.price === 0).sort(byStart) },
   { key: 'online', label: 'Join from home', href: '/events/?f=online', items: up.filter((v) => v.online).sort(byStart) },
 ].filter((m) => m.items.length);
+
+// Finder photos: one per listed event, so pointing at a row can show that event's photo.
+// Only the first is loaded with the page; the rest load when the pointer first enters the panel.
+const finderIds = [...new Set(moods.flatMap((m) => m.items.slice(1, 6)))];
+const finderImgs = new Map(
+  await Promise.all(
+    finderIds.map(async (v) => [v.id, await responsive(v.e.cover_image_url, { widths: [320, 480, 720], ratio: [4, 5] })] as const),
+  ),
+);
+const finderSizes = '(min-width: 900px) 30vw, 50vw';
+
+// ---- seat ticker: the events running out first ----
+const running = up
+  .filter((v) => v.avail.canRegister && v.e.total_seats > 0)
+  .sort((a, b) => a.avail.seatsLeft - b.avail.seatsLeft || a.deadlineMs - b.deadlineMs)
+  .slice(0, 12);
 
 // ---- organisers' picks ----
 const picks = up.filter((v) => v.e.is_featured).slice(0, 6);
@@ -156,6 +172,28 @@ const jsonLd = {
         </div>
       </div>
     </div>
+    {running.length >= 3 && (
+      <div class="ticker" style={`--n:${running.length}`}>
+        <div class="wrap ticker-head">
+          <h3 class="ticker-label">Running out first</h3>
+          <button type="button" class="ticker-toggle" data-ticker-toggle aria-label="Pause the ticker">Pause</button>
+        </div>
+        <div class="ticker-viewport">
+          <div class="ticker-track">
+            {[0, 1].map((copy) => (
+              <ul class="ticker-list plain" role={copy ? undefined : 'list'} aria-hidden={copy ? 'true' : undefined} aria-label={copy ? undefined : 'Events with the fewest seats left'}>
+                {running.map((v) => (
+                  <li data-ev={v.id} data-avail={v.avail.key}>
+                    <a href={v.href} tabindex={copy ? -1 : undefined}>{v.title}</a>
+                    <span class="left num"><span data-f="left">{v.avail.seatsLeft}</span> left</span>
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
   </section>
 
   <!-- FINDER -->
@@ -174,8 +212,17 @@ const jsonLd = {
         </fieldset>
         {moods.map((m) => (
           <div class="panel" data-for={m.key}>
-            <a class="panel-photo" href={m.items[0].href} tabindex="-1" aria-hidden="true">
-              <Pic src={m.items[0].e.cover_image_url} alt="" widths={[320, 480, 720]} ratio={[4, 5]} sizes="(min-width: 900px) 30vw, 50vw" />
+            <a class="panel-photo" href={m.items[0].href} tabindex="-1" aria-hidden="true" data-tilt data-tilt-max="6">
+              <Pic src={m.items[0].e.cover_image_url} alt="" widths={[320, 480, 720]} ratio={[4, 5]} sizes={finderSizes} />
+              {m.items.slice(1, 6).map((v, i) => {
+                const img = finderImgs.get(v.id);
+                return img && (
+                  <picture class="alt" data-row={i + 1}>
+                    {img.sources.map((src) => <source type={src.type} data-srcset={src.srcset} sizes={finderSizes} />)}
+                    <img data-src={img.src} alt="" width={img.width} height={img.height} decoding="async" />
+                  </picture>
+                );
+              })}
             </a>
             <ol class="rows plain" role="list" aria-label={`${m.label}: ${plural(m.items.length, 'event')}`}>
               {m.items.slice(0, 6).map((v) => (
@@ -212,7 +259,7 @@ const jsonLd = {
         {picks.map((v, i) => (
           <li class="panel-pick" style={`--g:${grow[i] ?? 2}`} data-ev={v.id} data-avail={v.avail.key}>
             <a href={v.href}>
-              <Pic src={v.e.cover_image_url} alt={v.e.cover_image_alt} widths={[480, 800, 1200]} ratio={[3, 2]} sizes="(min-width: 768px) 60vw, 70vw" />
+              <Pic src={v.e.cover_image_url} alt={v.e.cover_image_alt} widths={[480, 800, 1200]} ratio={[3, 2]} sizes="(min-width: 768px) 60vw, 70vw" imgClass="drift" vt={vtName(v.id)} />
               <span class="label">
                 <span class="t">{v.title}</span>
                 <span class="d small num">{v.whenShort}</span>
@@ -240,7 +287,7 @@ const jsonLd = {
         {weekend.map((d, di) => (
           <section class="day" aria-labelledby={`day-${d.day}`} data-reveal style={`--i:${di + 1}`}>
             <h3 id={`day-${d.day}`} class="day-title">
-              <span class="dn">{fmtDay(d.day, 'weekday')}</span>
+              <span class="dn wipe">{fmtDay(d.day, 'weekday')}</span>
               <span class="dd soft">{fmtDay(d.day, 'date')}, {plural(d.rows.length, 'event')}</span>
             </h3>
             <ol class="plain" role="list">
@@ -328,6 +375,10 @@ const jsonLd = {
     max-height: 66rem;
     font-size: clamp(4rem, 1rem + 15vw, 13.5rem);
     overflow: hidden;
+    --px: 0;
+    --py: 0;
+    view-timeline: --hero block;
+    view-timeline-inset: var(--header-h) 0; /* measure from under the sticky header, not the scroll padding */
   }
   .field {
     position: absolute;
@@ -375,7 +426,7 @@ const jsonLd = {
   }
   .hero :global(.slot-hit:focus-visible) { outline: 4px solid var(--accent); outline-offset: 4px; }
   .slot.spinning picture { transition: none; }
-  .slot.spinning picture.on img { animation: reel 120ms linear; }
+  .slot.spinning picture.on img { animation: reel 140ms var(--ease-out); transform-origin: 50% 0; }
   .slot.landed { animation: land 520ms var(--ease-out); }
   .slot.landed::after {
     content: '';
@@ -383,9 +434,10 @@ const jsonLd = {
     inset: 0;
     box-shadow: inset 0 0 0 0.05em var(--accent); /* taste-skill-ignore: an outline on the dealt photo, not a shadow */
   }
+  /* Each frame drops in like a split-flap departure board. */
   @keyframes reel {
-    from { transform: translateY(-45%); filter: blur(3px); }
-    to { transform: none; filter: none; }
+    from { transform: perspective(320px) rotateX(-88deg); filter: brightness(0.45); }
+    to { transform: perspective(320px) rotateX(0deg); filter: none; }
   }
   @keyframes land {
     0% { transform: none; }
@@ -419,6 +471,58 @@ const jsonLd = {
     --focus: var(--paper);
   }
   .hero-foot .lead { max-width: 34ch; }
+  /* The foot sits on the navy field, so its buttons sweep to white like the navy sections. */
+  .hero-foot .button { --sweep: var(--paper); --sweep-fg: var(--navy); }
+  .hero-foot .button.quiet { --bg: var(--navy-2); --fg: var(--paper); --sweep: #34467a; --sweep-fg: var(--paper); }
+
+  /* ---------- hero motion ----------
+     Load: the navy field rises and the white half of the headline appears with it.
+     Pointer: the two lines sit at different depths and shift against each other (motion.ts sets
+     --px and --py from -1 to 1), and the photo moves inside its frame like a window.
+     Scroll: the lines slide apart as the hero leaves the screen.
+     The two ink copies of the headline share these rules, so the colour split stays exact. */
+  @media (prefers-reduced-motion: no-preference) {
+    .field { transform-origin: 50% 100%; animation: field-rise 1150ms var(--ease-in-out) backwards; }
+    .title .l1, .hero :global(.slot-hit) { transform: translate3d(calc(var(--px) * -0.8vw), calc(var(--py) * -0.45vw), 0); }
+    .title .l2 { transform: translate3d(calc(var(--px) * 1.3vw), calc(var(--py) * 0.6vw), 0); }
+    .title .l1, .title .l2, .hero :global(.slot-hit) { transition: transform 900ms var(--ease-out); }
+    .title .l1 { animation: line-in 1100ms 150ms var(--ease-out) backwards; }
+    .title .l2 { animation: line-in 1100ms 260ms var(--ease-out) backwards; }
+    .slot { animation: flip-in 900ms 650ms var(--ease-out) backwards; }
+    /* Keep flip-in in the list so it doesn't replay when .landed comes off. */
+    .slot.landed { animation: flip-in 900ms 650ms var(--ease-out) backwards, land 520ms var(--ease-out); }
+    .hero-foot { animation: foot-in 900ms 700ms var(--ease-out) backwards; }
+    .slot img { transition: scale 600ms var(--ease-out), transform 900ms var(--ease-out); }
+    :global(.hero:has(.slot-hit:hover) .slot img) { scale: 1.12; }
+    @media (hover: hover) and (pointer: fine) {
+      .slot img { transform: translate3d(calc(var(--px) * -5%), calc(var(--py) * -8%), 0) scale(1.16); }
+    }
+    @supports (animation-timeline: view()) {
+      .title .l1 {
+        animation: line-in 1100ms 150ms var(--ease-out) backwards, slide-left linear both;
+        animation-timeline: auto, --hero;
+        animation-range: normal, exit 0% exit 100%;
+      }
+      .title .l2 {
+        animation: line-in 1100ms 260ms var(--ease-out) backwards, slide-right linear both;
+        animation-timeline: auto, --hero;
+        animation-range: normal, exit 0% exit 100%;
+      }
+      .hero :global(.slot-hit) { animation: slide-left linear both; animation-timeline: --hero; animation-range: exit 0% exit 100%; }
+      .hero-foot {
+        animation: foot-in 900ms 700ms var(--ease-out) backwards, foot-out linear both;
+        animation-timeline: auto, --hero;
+        animation-range: normal, exit 0% exit 45%;
+      }
+    }
+  }
+  @keyframes field-rise { from { transform: scaleY(0); } }
+  @keyframes line-in { from { transform: translate3d(0, 0.24em, 0); } }
+  @keyframes flip-in { from { transform: perspective(600px) rotateX(-95deg); } }
+  @keyframes foot-in { from { transform: translateY(2.5rem); } }
+  @keyframes slide-left { to { translate: -9vw 0; } }
+  @keyframes slide-right { to { translate: 7vw 0; } }
+  @keyframes foot-out { to { translate: 0 -2.5rem; opacity: 0; } }
 
   /* ---------- figures ---------- */
   .figures { padding-block: clamp(5rem, 12vh, 9rem); }
@@ -429,6 +533,58 @@ const jsonLd = {
   .fig-text { font-size: var(--fs-lead); line-height: 1.35; color: var(--on-navy-soft); max-width: 34ch; }
   .fig-text b { color: var(--paper); font-weight: 600; }
   .figures .live-note button { color: var(--paper); }
+
+  /* Seat ticker: the events with the fewest seats left, scrolling past. It stops while you point
+     at it or tab into it, and the Pause button stops it for good. Static for reduced motion. */
+  .ticker { margin-top: clamp(4rem, 9vh, 6.5rem); border-top: 1px solid var(--navy-2); }
+  .ticker-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 0.75rem; }
+  .ticker-label { font-size: var(--fs-small); font-weight: 600; color: var(--on-navy-soft); }
+  .ticker-toggle {
+    display: none;
+    align-items: center;
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    margin-right: -0.75rem;
+    background: none;
+    border: 0;
+    color: var(--paper);
+    font-size: var(--fs-small);
+    font-weight: 560;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  :global(.js) .ticker-toggle { display: inline-flex; }
+  .ticker-viewport { overflow: hidden; padding-block: 0.25rem 0.5rem; }
+  .ticker-track { display: flex; width: max-content; }
+  .ticker-list { display: flex; flex: none; }
+  .ticker-list li { display: flex; align-items: baseline; gap: 0.7rem; padding-right: 2.25rem; white-space: nowrap; }
+  .ticker-list li::before { content: ''; width: 0.5rem; height: 0.5rem; background: var(--accent); align-self: center; flex: none; }
+  .ticker-list a {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 720;
+    font-size: clamp(1.75rem, 1.1rem + 1.8vw, 2.875rem);
+    line-height: 1.15;
+    color: var(--paper);
+    text-decoration: none;
+    transition: color var(--t-hover) ease;
+  }
+  .ticker-list a:hover { color: var(--accent); }
+  .ticker-list .left { color: var(--accent); font-weight: 600; }
+  .ticker-list li:not([data-avail='few']):not([data-avail='open']) .left { color: var(--on-navy-soft); }
+  @media (prefers-reduced-motion: no-preference) {
+    .ticker-track { animation: ticker calc(var(--n) * 3.2s) linear infinite; }
+    .ticker-viewport:hover .ticker-track,
+    .ticker-viewport:focus-within .ticker-track,
+    .ticker.paused .ticker-track { animation-play-state: paused; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-viewport { overflow-x: auto; }
+    .ticker-list[aria-hidden='true'] { display: none; }
+    :global(.js) .ticker-toggle { display: none; }
+  }
+  @keyframes ticker { to { transform: translateX(-50%); } }
 
   /* ---------- finder ---------- */
   .finder { padding-block: var(--section); }
@@ -453,8 +609,9 @@ const jsonLd = {
     padding: 0.4rem 1rem;
     background: var(--tone);
     font-weight: 560;
-    transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+    transition: background-color var(--t-hover) ease, color var(--t-hover) ease, transform var(--t-press) var(--ease-out);
   }
+  .chip:active > span { transform: scale(0.96); }
   .chip .count { color: var(--ink-soft); font-weight: 500; }
   .chip:hover > span { background: var(--tone-2); }
   .chip input:checked + span { background: var(--navy); color: var(--paper); }
@@ -469,8 +626,12 @@ const jsonLd = {
   .finder:has(#mood-free:checked) .panel[data-for='free'],
   .finder:has(#mood-online:checked) .panel[data-for='online'] { display: grid; }
 
-  .panel-photo { grid-column: 1 / 5; grid-row: 1 / 3; align-self: end; }
+  .panel-photo { grid-column: 1 / 5; grid-row: 1 / 3; align-self: end; position: relative; display: block; overflow: clip; }
   .panel-photo :global(img) { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+  /* Other events' photos wait above the first, and fade in when you point at their row. */
+  .panel-photo .alt { position: absolute; inset: 0; opacity: 0; scale: 1.06; transition: opacity 450ms ease, scale 900ms var(--ease-out); }
+  .panel-photo .alt img { height: 100%; }
+  .panel-photo .alt.on { opacity: 1; scale: 1; }
   .rows { grid-column: 6 / -1; grid-row: 1; }
   .row {
     display: grid;
@@ -479,6 +640,19 @@ const jsonLd = {
     align-items: baseline;
     padding-block: 0.9rem;
   }
+  .row { position: relative; }
+  .row::before {
+    content: '';
+    position: absolute;
+    left: -0.9rem;
+    top: 0.9rem;
+    bottom: 0.9rem;
+    width: 3px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 320ms var(--ease-out);
+  }
+  .row:hover::before, .row:focus-within::before { transform: scaleY(1); }
   .row + .row { margin-top: 0.15rem; }
   .row:nth-child(4) { margin-top: 1.4rem; }
   .row .when { font-size: var(--fs-small); }
@@ -496,7 +670,7 @@ const jsonLd = {
     flex: var(--g) 1 0;
     min-width: 0;
     position: relative;
-    overflow: hidden;
+    overflow: clip;
     transition: flex-grow 500ms var(--ease-out);
   }
   .panel-pick a { display: block; height: 100%; color: var(--paper); text-decoration: none; }
@@ -590,6 +764,15 @@ const jsonLd = {
     transition: transform var(--t-ui) var(--ease-out);
   }
   .qs details[open] summary::after { transform: translateY(15%) rotate(-135deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .qs { interpolate-size: allow-keywords; }
+    .qs details::details-content {
+      height: 0;
+      overflow: clip;
+      transition: height 420ms var(--ease-out), content-visibility 420ms allow-discrete;
+    }
+    .qs details[open]::details-content { height: auto; }
+  }
   .qs p { max-width: 52ch; }
 
   /* ---------- close ---------- */

@@ -11,19 +11,24 @@ interface Props {
   eager?: boolean;
   priority?: boolean;
   class?: string;
+  /** Class for the <img> itself (e.g. a scroll-driven drift inside a clipped frame). */
+  imgClass?: string;
+  /** view-transition-name, so the photo can morph into the same photo on the next page. */
+  vt?: string;
   quality?: number;
 }
 
-const { src, alt, widths, sizes, ratio = [3, 2], formats, eager = false, priority = false, class: cls, quality } = Astro.props;
+const { src, alt, widths, sizes, ratio = [3, 2], formats, eager = false, priority = false, class: cls, imgClass, vt, quality } = Astro.props;
 const img = await responsive(src, { widths, ratio, formats, quality });
 const w = img?.width ?? widths[0];
 const h = img?.height ?? Math.round((widths[0] * ratio[1]) / ratio[0]);
 ---
 {img ? (
-  <picture class={cls}>
+  <picture class:list={[cls, vt && 'vt-photo']} style={vt ? `view-transition-name:${vt}` : undefined}>
     {img.sources.map((s) => <source type={s.type} srcset={s.srcset} sizes={sizes} />)}
     <img
       src={img.src}
+      class={imgClass}
       alt={alt}
       width={w}
       height={h}

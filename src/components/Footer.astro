@@ -12,7 +12,7 @@ const year = new Date(ds.fetchedAt).getFullYear();
       <p>Event photographs are from Pexels, supplied with each event.</p>
       <a class="top text-link" href="#main">Back to top</a>
     </div>
-    <p class="name wordmark" aria-hidden="true" data-bell title="Ring the bell">afterclass</p>
+    <p class="name wordmark" aria-hidden="true" data-bell title="Ring the bell">{[...'afterclass'].map((c, i) => <span class="lt" style={`--i:${i}`}><span>{c}</span></span>)}</p>
     <div class="meta small">
       <nav aria-label="Footer">
         <a href="/events/">All events</a>
@@ -45,6 +45,26 @@ const year = new Date(ds.fetchedAt).getFullYear();
     transition: color var(--t-hover) ease;
   }
   .name:hover { color: var(--accent); }
+  .lt, .lt > span { display: inline-block; }
+  @media (prefers-reduced-motion: no-preference) {
+    /* Point at the wordmark and a wave runs through it, letter by letter. */
+    .name:hover .lt > span { animation: wave 700ms var(--ease-out) calc(var(--i) * 45ms); }
+    @supports (animation-timeline: view()) {
+      /* The letters rise out of the bottom of the page as it scrolls into view, one after another. */
+      .name { clip-path: inset(-0.4em -0.2em 0 -0.2em); }
+      .lt {
+        animation: letter-rise linear both;
+        animation-timeline: view();
+        animation-range: entry calc(var(--i) * 4%) entry calc(60% + var(--i) * 4%);
+      }
+    }
+  }
+  @keyframes wave {
+    0%, 100% { transform: none; }
+    35% { transform: translateY(-0.14em) rotate(-4deg); }
+    70% { transform: translateY(0.03em); }
+  }
+  @keyframes letter-rise { from { translate: 0 0.85em; } to { translate: 0 0; } }
   .meta {
     display: grid;
     grid-template-columns: 1fr 1.4fr auto;

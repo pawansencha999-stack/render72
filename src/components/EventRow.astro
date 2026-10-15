@@ -1,6 +1,6 @@
 ---
 import Pic from './Pic.astro';
-import type { EventView } from '../lib/events';
+import { vtName, type EventView } from '../lib/events';
 
 interface Props {
   v: EventView;
@@ -33,9 +33,11 @@ const filters = [
   data-price={e.price}
   data-home={home}
   data-search={v.search}
+  data-tilt=".ev-img"
+  data-tilt-max="9"
 >
   <div class="ev-img">
-    <Pic src={e.cover_image_url} alt="" widths={[176, 264, 352]} ratio={[4, 3]} formats={['webp']} sizes="(min-width: 1100px) 176px, (min-width: 700px) 132px, 96px" eager={eager} quality={60} />
+    <Pic src={e.cover_image_url} alt="" widths={[176, 264, 352]} ratio={[4, 3]} formats={['webp']} sizes="(min-width: 1100px) 176px, (min-width: 700px) 132px, 96px" eager={eager} quality={60} vt={vtName(v.id)} />
   </div>
   <div class="ev-when num">
     <span class="d">{v.whenDate}</span>
@@ -81,6 +83,11 @@ const filters = [
   .ev:nth-child(even) { background: #f6f7f9; }
   .ev:hover { background: var(--tone); }
   .ev-img :global(img), .ev-img :global(.pic-missing) { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+  /* The photo zooms a little inside its frame when you point at the row (motion.ts also tilts it). */
+  .ev-img :global(img) { transition: scale 700ms var(--ease-out); }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .ev:hover .ev-img :global(img) { scale: 1.09; }
+  }
   .ev-when { display: grid; gap: 0.15rem; padding-top: 0.15rem; }
   .ev-when .d { font-weight: 600; }
   .ev-when .t { font-size: var(--fs-small); }

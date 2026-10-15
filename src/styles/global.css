@@ -180,6 +180,11 @@ strong, b { font-weight: 650; }
 .button {
   --bg: var(--accent);
   --fg: var(--accent-ink);
+  --sweep: var(--navy);
+  --sweep-fg: var(--paper);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -195,21 +200,42 @@ strong, b { font-weight: 650; }
   line-height: 1.1;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color var(--t-hover) ease, transform var(--t-press) var(--ease-out);
+  /* --mx/--my are set by the magnetic effect in motion.ts */
+  translate: var(--mx, 0px) var(--my, 0px);
+  transition:
+    color 320ms var(--ease-out),
+    transform var(--t-press) var(--ease-out),
+    translate 380ms var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }
-.button:hover { --bg: var(--accent-press); }
-.button:active { transform: translateY(1px) scale(0.985); }
-.button.quiet { --bg: var(--tone); --fg: var(--navy); }
-.button.quiet:hover { --bg: var(--tone-2); }
-.chapter[data-chapter='navy'] .button.quiet { --bg: var(--navy-2); --fg: var(--paper); }
-.chapter[data-chapter='navy'] .button.quiet:hover { --bg: #34467a; }
+/* Hover: a second colour sweeps across from the left. */
+.button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--sweep);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 460ms var(--ease-out);
+}
+@media (hover: hover) {
+  .button:hover { color: var(--sweep-fg); }
+  .button:hover::before { transform: scaleX(1); transform-origin: left center; }
+}
+.button:active { transform: translateY(1px) scale(0.97); }
+.button.quiet { --bg: var(--tone); --fg: var(--navy); --sweep: var(--tone-2); --sweep-fg: var(--navy); }
+.chapter[data-chapter='navy'] .button,
+.site-header[data-on='navy'] .button { --sweep: var(--paper); --sweep-fg: var(--navy); }
+.chapter[data-chapter='navy'] .button.quiet { --bg: var(--navy-2); --fg: var(--paper); --sweep: #34467a; --sweep-fg: var(--paper); }
 .button[aria-disabled='true'], .button:disabled {
   --bg: var(--tone);
   --fg: var(--ink-soft);
   cursor: not-allowed;
   transform: none;
+  translate: none;
 }
+.button[aria-disabled='true']::before, .button:disabled::before { display: none; }
 .button.small-btn { min-height: 2.75rem; padding: 0.5rem 1rem; font-size: 1rem; }
 
 .text-link {
@@ -237,6 +263,11 @@ strong, b { font-weight: 650; }
   transform: scaleX(var(--fill));
   transition: transform 600ms var(--ease-out);
 }
+@media (prefers-reduced-motion: no-preference) {
+  /* Off-screen rows only render when scrolled near, so their meters fill as they arrive. */
+  .meter > span { animation: meter-fill 1100ms var(--ease-out) 150ms both; }
+}
+@keyframes meter-fill { from { transform: scaleX(0); } }
 [data-avail='few'] .meter > span { background: var(--accent); }
 [data-avail='soldout'] .meter > span,
 [data-avail='regclosed'] .meter > span,
@@ -323,4 +354,55 @@ strong, b { font-weight: 650; }
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+
+/* ==== Motion layer ======================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* No smooth scrolling: off-screen sections skip layout, so a smooth jump aims at a target
+     that moves as they render and lands in the wrong place. Jumps are instant and exact. */
+
+  /* Page-to-page transitions (Chrome, Edge, Safari 18+). No JavaScript involved:
+     the old page lifts away, the new one rises in, the header stays put, and an
+     event's photo grows from the list into the event page's banner. */
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root) { animation: vt-out 240ms var(--ease-in-out) both; }
+  ::view-transition-new(root) { animation: vt-in 520ms var(--ease-out) both; }
+  ::view-transition-group(*) { animation-duration: 560ms; animation-timing-function: var(--ease-in-out); }
+  /* Photos keep their crop while they change shape (a 4:3 thumbnail into a 16:9 banner). */
+  ::view-transition-old(*), ::view-transition-new(*) { height: 100%; object-fit: cover; }
+}
+@keyframes vt-out { to { opacity: 0; transform: translateY(-14px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(22px); } }
+.site-header { view-transition-name: site-header; }
+.vt-photo { display: block; overflow: clip; } /* clip, not hidden: hidden would make it a scroll container and stall view() timelines inside */
+
+/* 3D tilt (motion.ts sets the transform on pointer move). */
+[data-tilt-el] { transition: transform 500ms var(--ease-out), box-shadow 500ms var(--ease-out); }
+[data-tilt-el].tilting {
+  will-change: transform;
+  box-shadow: 0 24px 48px -24px rgba(15, 22, 40, 0.55); /* taste-skill-ignore: only while lifted under the pointer */
+}
+
+/* Scroll-driven effects, where the browser supports them. They run off the main thread. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .wipe {
+      animation: wipe linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+    .drift {
+      scale: 1.14;
+      animation: drift linear both;
+      animation-timeline: view();
+      animation-range: cover;
+    }
+  }
+}
+@keyframes wipe { from { opacity: 0; translate: 0 0.5em; } to { opacity: 1; translate: 0 0; } } /* opacity + translate only, so it runs on the compositor */
+@keyframes drift {
+  from { translate: 0 -6%; }
+  to { translate: 0 6%; }
 }

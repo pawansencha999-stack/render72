@@ -198,3 +198,8 @@ export function overview(views: EventView[]): Overview {
     last: lastByEnd,
   };
 }
+
+/** The view-transition-name shared by an event's photo on every page, so it can morph between them. */
+export function vtName(id: string): string {
+  return `vt-${id.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`;
+}
