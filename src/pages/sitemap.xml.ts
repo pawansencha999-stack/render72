@@ -5,7 +5,7 @@ import { toView } from '../lib/events';
 export const GET: APIRoute = async ({ site }) => {
   const ds = await getDataset();
   const base = site ?? new URL('https://example.invalid');
-  const paths = ['/', '/events/', ...ds.events.map((e) => toView(e, ds.fetchedAt).href)];
+  const paths = ['/', '/events/', '/plan/', ...ds.events.map((e) => toView(e, ds.fetchedAt).href)];
   const lastmod = new Date(ds.fetchedAt).toISOString().slice(0, 10);
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

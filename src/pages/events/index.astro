@@ -4,16 +4,14 @@ import EventRow from '../../components/EventRow.astro';
 import Timetable from '../../components/Timetable.astro';
 import { getDataset } from '../../lib/api';
 import { toView, overview } from '../../lib/events';
-import { fmtDay, plural } from '../../lib/format';
+import { fmtDay, fmtSpan, plural } from '../../lib/format';
 
 const ds = await getDataset();
 const views = ds.events.map((e) => toView(e, ds.fetchedAt));
 const ov = overview(views);
 const days = ov.days;
 const groups = days.map((day) => ({ day, items: ov.upcoming.filter((v) => v.firstDay === day) }));
-const span = days.length
-  ? `${fmtDay(days[0], 'weekday')} ${fmtDay(days[0], 'date').split(' ')[0]} to ${fmtDay(days[days.length - 1], 'long')}`
-  : '';
+const span = days.length ? fmtSpan(days[0], days[days.length - 1]) : '';
 
 const filterGroups = [
   { name: 'avail', label: 'Availability', options: [{ v: 'open', l: 'Open for registration' }] },
@@ -77,11 +75,11 @@ let eagerCount = 0;
 
       <fieldset class="seg days" aria-label="Day">
         <legend class="visually-hidden">Day</legend>
-        <label><input type="radio" name="day" value="all" checked /><span>All upcoming</span></label>
+        <label><input type="radio" name="day" value="all" checked /><span>All upcoming <b class="dc num">{ov.upcoming.length}</b></span></label>
         {days.map((d) => (
-          <label><input type="radio" name="day" value={d} /><span>{fmtDay(d)}</span></label>
+          <label><input type="radio" name="day" value={d} /><span>{fmtDay(d)} <b class="dc num">{ov.upcoming.filter((v) => v.days.includes(d)).length}</b></span></label>
         ))}
-        {ov.past.length > 0 && <label><input type="radio" name="day" value="past" /><span>Already happened</span></label>}
+        {ov.past.length > 0 && <label><input type="radio" name="day" value="past" /><span>Already happened <b class="dc num">{ov.past.length}</b></span></label>}
       </fieldset>
 
       <div class="filter-panel" id="filter-panel">
@@ -219,6 +217,8 @@ let eagerCount = 0;
   }
   .seg label:hover span { background: var(--tone-2); }
   .seg input:checked + span { background: var(--navy); color: var(--paper); }
+  .seg .dc { font-weight: 500; color: var(--ink-soft); margin-left: 0.3rem; }
+  .seg input:checked + span .dc { color: var(--on-navy-soft); }
   .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
 
   .days { margin-top: 0.75rem; overflow-x: auto; scrollbar-width: none; }

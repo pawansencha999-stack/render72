@@ -6,9 +6,11 @@ interface Props {
   v: EventView;
   home?: string;
   eager?: boolean;
-  headingLevel?: 'h2' | 'h3';
+  headingLevel?: 'h2' | 'h3' | 'h4';
+  /** Rendered hidden (the plan page shows saved rows itself). */
+  hidden?: boolean;
 }
-const { v, home, eager = false, headingLevel = 'h3' } = Astro.props;
+const { v, home, eager = false, headingLevel = 'h3', hidden = false } = Astro.props;
 const H = headingLevel;
 const e = v.e;
 const filters = [
@@ -35,6 +37,7 @@ const filters = [
   data-search={v.search}
   data-tilt=".ev-img"
   data-tilt-max="9"
+  hidden={hidden}
 >
   <div class="ev-img">
     <Pic src={e.cover_image_url} alt="" widths={[176, 264, 352]} ratio={[4, 3]} formats={['webp']} sizes="(min-width: 1100px) 176px, (min-width: 700px) 132px, 96px" eager={eager} quality={60} vt={vtName(v.id)} />
@@ -50,11 +53,17 @@ const filters = [
       <span>{e.category}</span>
       <span>{v.online ? 'Online' : v.venue}</span>
     </p>
+    <p class="clash small" data-clash={v.id} hidden></p>
   </div>
   <div class="ev-entry">
     <span class="price num">{v.price.amount}</span>
     {v.price.unit && <span class="soft small">{v.price.unit}</span>}
     <span class="soft small">{v.team}</span>
+    {!v.isPast && (
+      <button type="button" class="save" data-save={v.id} data-title={v.title} data-label-off="Save" data-label-on="Saved" aria-label={`Save ${v.title} to your plan`}>
+        <span class="save-mark" aria-hidden="true"></span><span data-save-label>Save</span>
+      </button>
+    )}
   </div>
   <div class="ev-seats">
     <span class="status" data-f="status" data-avail={v.avail.key}>{v.avail.label}</span>
@@ -108,6 +117,9 @@ const filters = [
   .ev-entry .price { font-weight: 650; font-size: 1.25rem; line-height: 1.1; }
   .ev-seats { display: grid; gap: 0.45rem; padding-top: 0.25rem; }
   .ev[data-avail='removed'] { opacity: 0.6; }
+  /* Saved rows carry a tangerine edge. */
+  .ev[data-saved] { box-shadow: inset 4px 0 0 var(--accent); }
+  .ev-entry .save { margin-top: 0.6rem; justify-self: start; }
 
   @media (max-width: 1180px) {
     .ev { grid-template-columns: 132px minmax(0, 1fr) 11rem; row-gap: 0.75rem; }
@@ -124,6 +136,7 @@ const filters = [
     .ev-main { grid-column: 2; grid-row: 2; }
     .ev-entry { grid-column: 1 / -1; grid-row: 3; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.6rem; padding-top: 0.4rem; }
     .ev-entry .price { font-size: 1.125rem; }
+    .ev-entry .save { margin: 0 0 0 auto; align-self: center; }
     .ev-seats { grid-column: 1 / -1; grid-row: 4; grid-template-columns: auto minmax(0, 1fr); gap: 0.35rem 0.75rem; align-items: center; }
     .ev-seats .meter { grid-column: 1 / -1; grid-row: 2; }
     .ev-seats [data-f='seats'] { grid-column: 2; grid-row: 1; }

@@ -159,6 +159,12 @@ const jsonLd = {
               <span class="button register" aria-disabled="true">Registration details coming soon</span>
             )}
             {lead && <p class="small soft reg-note">Register opens an email to {lead.name}, {lead.role.toLowerCase()}, with the details they need already listed.</p>}
+            {!v.isPast && (
+              <button type="button" class="save save-wide" data-save={v.id} data-name={v.title} data-label-off="Save to your plan" data-label-on="Saved to your plan">
+                <span class="save-mark" aria-hidden="true"></span><span data-save-label>Save to your plan</span>
+              </button>
+            )}
+            <p class="clash small" data-clash={v.id} data-clash-when hidden></p>
             <div class="secondary">
               <a class="button quiet small-btn" href={`${v.href}calendar.ics`} download={`${v.slug}.ics`}>Add to calendar</a>
               <button type="button" class="button quiet small-btn" data-share data-title={e.name} data-url={v.href}>Share</button>

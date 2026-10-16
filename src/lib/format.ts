@@ -41,6 +41,16 @@ export function fmtDay(ymd: string, style: 'short' | 'long' | 'weekday' | 'date'
   return `${DAYS_SHORT[dow]} ${d} ${MONTHS_SHORT[m - 1]}`;
 }
 
+/** "Friday 13 to Sunday 15 November", or "Sunday 18 October to Sunday 15 November" across months. */
+export function fmtSpan(first: string, last: string): string {
+  if (!first || !last) return '';
+  if (first === last) return fmtDay(first, 'long');
+  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
+  return sameMonth
+    ? `${fmtDay(first, 'weekday')} ${parseYMD(first).d} to ${fmtDay(last, 'long')}`
+    : `${fmtDay(first, 'long')} to ${fmtDay(last, 'long')}`;
+}
+
 /** "6 pm", "9:30 am", "noon", "midnight". */
 export function fmtTime(hm: string, withMeridiem = true): string {
   const { h, mi } = parseHM(hm);

@@ -1,5 +1,5 @@
 ---
-interface Props { current?: 'home' | 'events' | 'timetable' | 'none' }
+interface Props { current?: 'home' | 'events' | 'timetable' | 'plan' | 'none' }
 const { current = 'none' } = Astro.props;
 const links = [
   { href: '/events/', label: 'All events', key: 'events' },
@@ -14,6 +14,7 @@ const links = [
       {links.map((l) => (
         <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.label}</a>
       ))}
+      <a class="plan-link" href="/plan/" aria-current={current === 'plan' ? 'page' : undefined}>Your plan <span class="plan-count num" data-plan-count>0</span></a>
     </nav>
     <a class="button small-btn action" href="/events/">Find an event</a>
     <details class="menu">
@@ -22,6 +23,7 @@ const links = [
         {links.map((l) => (
           <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.label}</a>
         ))}
+        <a href="/plan/" aria-current={current === 'plan' ? 'page' : undefined}>Your plan <span class="plan-count num" data-plan-count>0</span></a>
       </nav>
     </details>
   </div>
@@ -71,6 +73,30 @@ const links = [
     transition: transform var(--t-ui) var(--ease-out);
   }
   .links a:hover::after, .links a[aria-current='page']::after { transform: scaleX(1); }
+  /* The count of saved events. A fixed width, so the header never shifts as it changes. */
+  .plan-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.6em;
+    height: 1.6em;
+    margin-left: 0.3rem;
+    padding-inline: 0.3em;
+    background: var(--tone);
+    color: var(--navy);
+    font-size: 0.8125rem;
+    font-weight: 650;
+    vertical-align: 0.1em;
+  }
+  .site-header[data-on='navy'] .plan-count { background: var(--navy-2); color: var(--paper); }
+  .menu nav .plan-count { font-size: 1.125rem; background: var(--accent); color: var(--accent-ink); vertical-align: 0.3em; }
+  @media (prefers-reduced-motion: no-preference) {
+    .plan-count:global(.bump) { animation: count-bump 520ms var(--ease-out); }
+  }
+  @keyframes count-bump {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.35); background: var(--accent); color: var(--accent-ink); }
+    100% { transform: scale(1); }
+  }
 
   .menu { display: none; position: relative; }
   .menu summary {

@@ -4,18 +4,17 @@ import Pic from '../components/Pic.astro';
 import { getDataset } from '../lib/api';
 import { toView, overview, vtName, type EventView } from '../lib/events';
 import { responsive } from '../lib/images';
-import { fmtDay, fmtTime, fmtRupees, groupIN, fmtDeadline, plural } from '../lib/format';
+import { fmtDay, fmtSpan, fmtTime, fmtRupees, groupIN, fmtDeadline, plural } from '../lib/format';
 
 const ds = await getDataset();
 const views = ds.events.map((e) => toView(e, ds.fetchedAt));
 const ov = overview(views);
 const up = ov.upcoming;
-const firstDay = ov.days[0];
-const lastDay = ov.days[ov.days.length - 1];
-const span =
-  firstDay && lastDay
-    ? `${fmtDay(firstDay, 'weekday')} ${fmtDay(firstDay, 'date').split(' ')[0]} to ${fmtDay(lastDay, 'weekday')} ${fmtDay(lastDay, 'long').split(' ').slice(1).join(' ')}`
-    : 'This season';
+// The page is about the fest weekend; anything outside it gets a line of its own.
+const fest = ov.main;
+const firstDay = ov.mainDays[0];
+const lastDay = ov.mainDays[ov.mainDays.length - 1];
+const span = firstDay && lastDay ? fmtSpan(firstDay, lastDay) : 'This season';
 
 // ---- hero: the photo in the headline cycles through events you can still join ----
 // It is also a slot machine: click it and it deals you one of these events.
@@ -35,7 +34,8 @@ const slotImgs = await Promise.all(
 const slot = slotEvents.map((v, i) => ({ v, img: slotImgs[i] })).filter((x) => x.img);
 
 // ---- finder ----
-const byStart = (a: EventView, b: EventView) => a.startMs - b.startMs;
+// Events you can still join come first in each list, then by start time.
+const byStart = (a: EventView, b: EventView) => Number(b.avail.canRegister) - Number(a.avail.canRegister) || a.startMs - b.startMs;
 const moods = [
   {
     key: 'soon', label: 'Closing soon', href: '/events/?f=open&sort=deadline',
@@ -69,23 +69,35 @@ const picks = up.filter((v) => v.e.is_featured).slice(0, 6);
 const grow = [5, 2, 3, 2, 3, 2];
 
 // ---- the weekend, day by day ----
-const weekend = ov.days.slice(0, 4).map((day) => ({
+const weekend = ov.mainDays.map((day) => ({
   day,
   rows: up
     .flatMap((v) => v.blocks.filter((b) => b.date === day).map((b) => ({ v, b })))
     .sort((a, b) => a.b.startMin - b.b.startMin || a.v.title.localeCompare(b.v.title)),
 }));
 const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-const lastBlock = ov.last?.blocks[ov.last.blocks.length - 1];
-const firstVenue = ov.first ? (ov.first.online ? 'online' : `the ${ov.first.venueShort}`) : '';
-const lastVenue = ov.last ? (ov.last.online ? 'online' : `the ${ov.last.venueShort}`) : '';
+const wFirst = ov.mainFirst;
+const wLast = ov.mainLast;
+const lastBlock = wLast?.blocks[wLast.blocks.length - 1];
+const firstVenue = wFirst ? (wFirst.online ? 'online' : `the ${wFirst.venueShort}`) : '';
+const lastVenue = wLast ? (wLast.online ? 'online' : `the ${wLast.venueShort}`) : '';
+
+// ---- countdown to the first event of the weekend (corrected in the browser) ----
+const cdLeft = wFirst ? Math.max(0, wFirst.startMs - ds.fetchedAt) : 0;
+const cd = {
+  d: Math.floor(cdLeft / 86_400_000),
+  h: Math.floor(cdLeft / 3_600_000) % 24,
+  m: Math.floor(cdLeft / 60_000) % 60,
+  s: Math.floor(cdLeft / 1000) % 60,
+};
+const two = (n: number) => String(n).padStart(2, '0');
 
 // ---- close ----
 const nextDeadline = up.filter((v) => v.avail.canRegister).sort((a, b) => a.deadlineMs - b.deadlineMs)[0];
 const perTeam = up.filter((v) => v.e.price > 0 && !v.e.is_per_head && v.e.max_teamsize > 1).length;
 const perHead = up.filter((v) => v.e.price > 0 && (v.e.is_per_head || v.e.max_teamsize <= 1)).length;
 
-const description = `${up.length} club events on campus, ${span}. Compare seats, fees and deadlines, then register before they fill.`;
+const description = `${fest.length} club events on campus, ${span}. Compare seats, fees and deadlines, then register before they fill.`;
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
@@ -93,12 +105,12 @@ const jsonLd = {
   description,
 };
 ---
-<Base title={`afterclass · ${up.length} campus events, ${span}`} description={description} current="home" jsonLd={jsonLd}>
+<Base title={`afterclass · ${fest.length} campus events, ${span}`} description={description} current="home" jsonLd={jsonLd}>
   <!-- HERO -->
   <section class="hero chapter" data-chapter="paper" aria-labelledby="hero-title">
     <div class="field" data-chapter="navy" aria-hidden="true"></div>
     <h1 id="hero-title" class="title display ink-a">
-      <span class="l1">{up.length} events,
+      <span class="l1">{fest.length} events,
         {slot.length > 0 && (
           <span class="slot" aria-hidden="true">
             {slot.map(({ v, img }, i) => (
@@ -162,6 +174,18 @@ const jsonLd = {
         <span class="hot num" data-agg="seatsLeft">{groupIN(ov.seatsLeft)}</span> of <span class="num" data-agg="seatsTotal">{groupIN(ov.seatsTotal)}</span> seats<br />are still open.
       </h2>
       <div class="fig-side">
+        {wFirst && (
+          <div class="countdown" data-countdown={wFirst.startMs} data-end={wLast?.endMs} data-reveal>
+            <p class="cd-label" data-cd-label>The weekend starts in</p>
+            <p class="cd-clock num" aria-hidden="true">
+              <span><b data-cd="d">{cd.d}</b><small>days</small></span>
+              <span><b data-cd="h">{two(cd.h)}</b><small>hrs</small></span>
+              <span><b data-cd="m">{two(cd.m)}</b><small>min</small></span>
+              <span><b data-cd="s">{two(cd.s)}</b><small>sec</small></span>
+            </p>
+            <p class="visually-hidden">The first event, {wFirst.title}, starts {fmtDay(wFirst.firstDay, 'long')} at {fmtTime(wFirst.e.schedule_summary.start_time)}.</p>
+          </div>
+        )}
         <p class="fig-text" data-reveal style="--i:1">
           Across <b class="num"><span data-agg="openCount">{ov.openCount}</span> events</b> from <b class="num">{ov.clubs} clubs</b>, with <b class="num">{fmtRupees(ov.prizePool)}</b> in prizes for the winners. The counts come straight from the organisers each time you open a page.
         </p>
@@ -277,10 +301,18 @@ const jsonLd = {
   <section class="weekend chapter defer" data-chapter="tone" aria-labelledby="weekend-title">
     <div class="wrap">
       <h2 id="weekend-title" class="head" data-reveal>The whole weekend</h2>
-      {ov.first && ov.last && lastBlock && (
+      {wFirst && wLast && lastBlock && (
         <p class="lead weekend-lead" data-reveal style="--i:1">
-          It starts at {fmtTime(ov.first.e.schedule_summary.start_time)} on {fmtDay(ov.first.firstDay, 'weekday')} at {firstVenue} and
+          It starts at {fmtTime(wFirst.e.schedule_summary.start_time)} on {fmtDay(wFirst.firstDay, 'weekday')} at {firstVenue} and
           ends at {fmtTime(hm(lastBlock.endMin))} on {fmtDay(lastBlock.date, 'weekday')} at {lastVenue}.
+        </p>
+      )}
+      {ov.extra.length > 0 && (
+        <p class="weekend-extra" data-reveal style="--i:1">
+          Also coming up:{' '}
+          {ov.extra.map((v, i) => (
+            <>{i > 0 && ', '}<a href={v.href}>{v.title}</a> on {fmtDay(v.firstDay, 'long')}{!v.avail.canRegister && <span class="soft"> ({v.avail.label.toLowerCase()})</span>}</>
+          ))}.
         </p>
       )}
       <div class="days">
@@ -360,8 +392,10 @@ const jsonLd = {
 <script>
   import { startLive } from '../scripts/live';
   import { startSlot } from '../scripts/slot';
+  import { startCountdown } from '../scripts/countdown';
   startLive();
   startSlot();
+  startCountdown();
 </script>
 
 <style>
@@ -530,6 +564,21 @@ const jsonLd = {
   .fig-title { font-size: var(--fs-head); }
   .fig-title .hot { color: var(--accent); }
   .fig-side { display: grid; gap: 1.75rem; padding-bottom: 0.4rem; }
+  .countdown { display: grid; gap: 0.5rem; }
+  .cd-label { font-size: var(--fs-small); font-weight: 600; color: var(--on-navy-soft); }
+  .cd-clock { display: flex; gap: clamp(0.9rem, 2vw, 1.6rem); }
+  .cd-clock span { display: grid; gap: 0.2rem; }
+  .cd-clock b {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 760;
+    font-size: clamp(2.5rem, 1.6rem + 2.6vw, 4.25rem);
+    line-height: 0.9;
+    font-variant-numeric: tabular-nums;
+    min-width: 2ch;
+  }
+  .cd-clock small { font-size: 0.8125rem; font-weight: 560; color: var(--on-navy-soft); }
+  .countdown[data-state='on'] .cd-clock, .countdown[data-state='over'] .cd-clock { display: none; }
   .fig-text { font-size: var(--fs-lead); line-height: 1.35; color: var(--on-navy-soft); max-width: 34ch; }
   .fig-text b { color: var(--paper); font-weight: 600; }
   .figures .live-note button { color: var(--paper); }
@@ -704,6 +753,8 @@ const jsonLd = {
   /* ---------- weekend ---------- */
   .weekend { padding-block: var(--section); }
   .weekend-lead { max-width: 40ch; margin-top: 1.5rem; }
+  .weekend-extra { max-width: 60ch; margin-top: 1rem; }
+  .weekend-extra a { font-weight: 600; }
   .days {
     margin-top: clamp(3rem, 6vw, 5.5rem);
     display: grid;

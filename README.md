@@ -10,10 +10,11 @@
 
 | Page | What it does |
 | --- | --- |
-| `/` | The weekend at a glance: the live seat count, a "what do you feel like doing" finder, the organisers' picks, the full weekend by day, and how registration works. |
+| `/` | The weekend at a glance: the live seat count, a countdown to the first event, a "what do you feel like doing" finder, the organisers' picks, the full weekend by day, and how registration works. |
 | `/events/` | Every event, in a list grouped by day or in a **timetable** that puts each day's events side by side so clashes are obvious. Search, filters, sort and the view all live in the URL, so a filtered view can be shared or bookmarked. |
 | `/events/<event-name>/` | One page per event, with schedule, prizes, eligibility, rules, FAQs and contacts. Includes a Register button, an "Add to calendar" file and a share button. |
 | `/events/<api-id>/` | Links that use an API id redirect to the event's page. If the id is newer than the build, the page asks the API for it and shows the essentials. |
+| `/plan/` | **Your plan.** The events you saved, with clashes, hours, fees and the next deadline worked out, a timetable with your events picked out, one calendar file for all of them, and a link to share the plan with your team. |
 | `404` | A plain "nothing here" page that points back to the events. |
 
 ## Design
@@ -25,6 +26,17 @@ The data describes one campus fest weekend: 27 events across Friday 13 to Sunday
 - **Colour:** navy ink on white, a cool grey for secondary surfaces, and tangerine reserved for actions and for "few seats left". Status is always shown in words, never by colour alone.
 - **Shapes:** square corners everywhere, and no drop shadows except on things that genuinely float (the sticky filter bar, the phone action bar, the menu).
 - **Data-heavy screens:** the events list reads like a timetable. Each row has the same columns (photo, when, what, entry fee and team size, seats left with a meter, register-by date), so events can be compared by scanning down. On phones each row restacks into a compact card.
+
+## Your plan
+
+Every event has a **Save** button, in the events list and on its own page, and saved events get a tangerine frame on the timetable. Saved events:
+
+- **Flag clashes as you go.** Save two events whose sessions overlap and both say so ("Clashes with SpanCraft, also in your plan"). Events you haven't saved warn you too, before you save them. The event page names the clashing event and its time.
+- **Collect on `/plan/`** with the numbers that matter for a weekend: how many events across how many days, hours of events, clashes, entry fees and the next registration deadline. The timetable below fades everything else out, so the free slots in your weekend are easy to see.
+- **Go into your calendar in one go.** "Add all to calendar" builds a single `.ics` file in the browser with every session of every saved event.
+- **Can be shared with a team.** "Share this plan" makes a short link. Whoever opens it sees the plan and can add it to theirs with one button.
+
+The plan is kept in the browser (`localStorage`) and never sent anywhere. The header shows how many events are in it, and it stays in step across open tabs. Session times for clash checks come from `/plan-data.json`, built with the site and fetched only when there is something to check.
 
 ## Easter eggs
 
@@ -56,6 +68,7 @@ The site never depends on the API being up at the moment someone visits.
 3. **When that fails**, the page shows what happened in plain words ("Can't reach the events service. Showing seat counts from 13 Oct, 11:52 pm.") with a **Try again** button. Seat counts saved on the device from an earlier visit are reused when they are newer than the build.
 4. **When an event disappears** (the API returns 404 or drops it from the list), its page says it is no longer listed and disables Register. List rows mark it "No longer listed".
 5. **Images** are downloaded and optimised during the build. If an image URL is dead, the build continues and the page shows a labelled placeholder.
+6. **Closed is not finished.** An event whose status is `CLOSED` but whose date is still ahead stays in the upcoming list, marked "Closed", with its date. Only `COMPLETED` events and events whose end time has passed count as already happened. The landing page tells the story of the main weekend and lists anything outside it separately.
 
 | Situation | What a visitor sees |
 | --- | --- |
@@ -75,6 +88,7 @@ Measured with Lighthouse 13.5 (mobile and desktop presets), against the producti
 | `/` | 99–100 | 100 | 100 | 100 |
 | `/events/` | 99–100 | 100 | 100 | 100 |
 | `/events/civicforge-24-build-for-the-city/` | 99–100 | 100 | 100 | 100 |
+| `/plan/` | 100 | 100 | 100 | 100 |
 
 On the live site (render72.vercel.app), repeated mobile runs scored 98–100 for Performance (LCP 1.3–1.7 s, CLS 0) and 100 for Accessibility, Best practices and SEO on the home, events and event pages; desktop runs scored 100 across the board. These were run from a development machine; [PageSpeed Insights](https://pagespeed.web.dev) runs the same test from Google's servers, so check there after each deploy.
 
@@ -139,9 +153,11 @@ src/
   scripts/      live.ts (live seats, cache, retry), events-page.ts (search/filter/sort/URL),
                 event-page.ts, slot.ts (hero photos, slot machine), chrome.ts (header colour,
                 reveals, easter eggs), bell.ts ("Class dismissed"), motion.ts (tilt, magnetic
-                buttons, hero depth, ticker, finder previews)
+                buttons, hero depth, ticker, finder previews), plan.ts (saving, clash notes),
+                plan-page.ts (the plan page), countdown.ts
   components/   Header, Footer, EventRow, Timetable, Pic
-  pages/        index, events/index, events/[slug]/index + calendar.ics, 404, robots.txt, sitemap.xml
+  pages/        index, events/index, events/[slug]/index + calendar.ics, plan/index,
+                plan-data.json, 404, robots.txt, sitemap.xml
   data/         snapshot.json (offline fallback)
 public/         font (+ licence), icons, _headers
 ```

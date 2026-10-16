@@ -174,6 +174,8 @@ strong, b { font-weight: 650; }
   content-visibility: auto;
   contain-intrinsic-size: auto 900px;
 }
+/* For one frame during an anchor jump (chrome.ts), so the jump lands exactly. */
+.jumping .defer, .jumping .ev { content-visibility: visible; }
 
 /* ---- controls ---- */
 
@@ -356,6 +358,70 @@ strong, b { font-weight: 650; }
   }
 }
 
+
+/* ==== Your plan ============================================================ */
+
+/* Save buttons. They sit above a row's stretched link, and need JavaScript, so they show only with it. */
+.save {
+  position: relative;
+  z-index: 1;
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  min-width: 6.25rem;
+  padding: 0.3rem 0.85rem 0.3rem 0.7rem;
+  border: 2px solid var(--tone-2);
+  background: var(--paper);
+  color: var(--navy);
+  font-size: var(--fs-small);
+  font-weight: 620;
+  cursor: pointer;
+  transition: background-color var(--t-hover) ease, border-color var(--t-hover) ease, color var(--t-hover) ease, transform var(--t-press) var(--ease-out);
+}
+.js .save { display: inline-flex; }
+.save-wide { width: 100%; justify-content: center; min-height: 3rem; font-size: 1rem; }
+.save:hover { border-color: var(--navy); }
+.save:active { transform: scale(0.96); }
+.save-mark {
+  position: relative;
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: none;
+  border: 2px solid currentColor;
+}
+.save[data-on='true'] { background: var(--navy); border-color: var(--navy); color: var(--paper); }
+.save[data-on='true'] .save-mark { background: var(--accent); border-color: var(--accent); }
+.save[data-on='true'] .save-mark::after {
+  content: '';
+  position: absolute;
+  left: 0.2rem;
+  top: 0;
+  width: 0.25rem;
+  height: 0.5rem;
+  border: solid var(--navy);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .save.pop .save-mark { animation: save-pop 480ms var(--ease-out); }
+}
+@keyframes save-pop {
+  0% { transform: scale(0.4) rotate(-45deg); }
+  60% { transform: scale(1.3) rotate(8deg); }
+  100% { transform: none; }
+}
+
+/* "Clashes with … in your plan" */
+.clash {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-top: 0.5rem;
+  color: var(--alert);
+  font-weight: 560;
+}
+.clash::before { content: ''; flex: none; width: 0.55rem; height: 0.55rem; background: currentColor; transform: translateY(-0.05em); }
 
 /* ==== Motion layer ======================================================== */
 

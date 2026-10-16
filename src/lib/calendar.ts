@@ -19,9 +19,15 @@ const fold = (line: string) => {
   return out.join('\r\n');
 };
 
+export interface Session {
+  start: number;
+  end: number;
+  venue: string;
+}
+
 /** Sessions that run straight through midnight become one calendar entry. */
-function mergedSessions(v: EventView) {
-  const out: { start: number; end: number; venue: string }[] = [];
+export function sessionsOf(v: EventView): Session[] {
+  const out: Session[] = [];
   for (const s of v.e.schedules) {
     const start = istEpoch(s.event_date, s.start_time);
     let end = istEpoch(s.event_date, s.end_time);
@@ -33,7 +39,17 @@ function mergedSessions(v: EventView) {
   return out;
 }
 
-export function icsFor(v: EventView, pageUrl: string, now = Date.now()): string {
+export interface CalendarEntry {
+  id: string;
+  name: string;
+  online: boolean;
+  description: string;
+  url: string;
+  sessions: Session[];
+}
+
+/** One .ics file holding any number of events. Used at build time and in the browser. */
+export function buildIcs(entries: CalendarEntry[], now = Date.now()): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -41,22 +57,28 @@ export function icsFor(v: EventView, pageUrl: string, now = Date.now()): string 
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
   ];
-  mergedSessions(v).forEach((s, i) => {
-    lines.push(
-      'BEGIN:VEVENT',
-      `UID:${v.id}-${i}@afterclass`,
-      `DTSTAMP:${utcStamp(now)}`,
-      `DTSTART:${utcStamp(s.start)}`,
-      `DTEND:${utcStamp(s.end)}`,
-      fold(`SUMMARY:${esc(v.e.name)}`),
-      fold(`LOCATION:${esc(v.online ? 'Online' : s.venue)}`),
-      fold(`DESCRIPTION:${esc(`${v.e.blurb}\n\n${pageUrl}`)}`),
-      fold(`URL:${pageUrl}`),
-      'END:VEVENT',
-    );
-  });
+  for (const ev of entries) {
+    ev.sessions.forEach((s, i) => {
+      lines.push(
+        'BEGIN:VEVENT',
+        `UID:${ev.id}-${i}@afterclass`,
+        `DTSTAMP:${utcStamp(now)}`,
+        `DTSTART:${utcStamp(s.start)}`,
+        `DTEND:${utcStamp(s.end)}`,
+        fold(`SUMMARY:${esc(ev.name)}`),
+        fold(`LOCATION:${esc(ev.online ? 'Online' : s.venue)}`),
+        fold(`DESCRIPTION:${esc(`${ev.description}\n\n${ev.url}`)}`),
+        fold(`URL:${ev.url}`),
+        'END:VEVENT',
+      );
+    });
+  }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';
+}
+
+export function icsFor(v: EventView, pageUrl: string, now = Date.now()): string {
+  return buildIcs([{ id: v.id, name: v.e.name, online: v.online, description: v.e.blurb, url: pageUrl, sessions: sessionsOf(v) }], now);
 }
 
 export function registerMailto(v: EventView): string | null {

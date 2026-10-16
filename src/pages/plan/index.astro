@@ -1,0 +1,177 @@
+---
+// Your plan: the events saved in this browser, with clashes, fees and deadlines worked out,
+// a timetable of the weekend with your events picked out, one calendar file for all of
+// them, and a link to share the plan with your team.
+import Base from '../../layouts/Base.astro';
+import EventRow from '../../components/EventRow.astro';
+import Timetable from '../../components/Timetable.astro';
+import { getDataset } from '../../lib/api';
+import { toView, overview } from '../../lib/events';
+import { fmtDay, plural } from '../../lib/format';
+
+const ds = await getDataset();
+const views = ds.events.map((e) => toView(e, ds.fetchedAt));
+const ov = overview(views);
+const days = ov.days;
+const groups = days.map((day) => ({ day, items: ov.upcoming.filter((v) => v.firstDay === day) }));
+const picks = ov.upcoming.filter((v) => v.e.is_featured && v.avail.canRegister).slice(0, 3);
+
+const description = `Save campus events as you browse and plan your weekend: clashes flagged, fees and deadlines added up, every event in one calendar file. ${plural(ov.upcoming.length, 'event')} to choose from.`;
+---
+<Base title="Your plan · afterclass" description={description} current="plan">
+  <div data-plan-page>
+    <section class="intro chapter" data-chapter="paper" aria-labelledby="page-title">
+      <div class="wrap intro-grid">
+        <h1 id="page-title" class="display page-title">Your plan</h1>
+        <div class="intro-side">
+          <p class="lead">Save events as you browse. They collect here with clashes flagged, fees and deadlines added up, and every event in one calendar file.</p>
+          <p class="small soft">Your plan is kept in this browser. Nothing is sent anywhere.</p>
+          <noscript><p class="small">Saving events needs JavaScript, which is turned off in this browser.</p></noscript>
+        </div>
+      </div>
+    </section>
+
+    <div class="shared wrap" data-plan-shared hidden>
+      <p class="lead"><b data-shared-count></b> Someone shared their plan with you.</p>
+      <div class="shared-actions">
+        <button type="button" class="button" data-shared-add>Add these to my plan</button>
+        <a class="button quiet" href="/plan/">See my own plan</a>
+      </div>
+    </div>
+
+    <section class="stats chapter" data-chapter="navy" aria-labelledby="stats-title" data-plan-filled hidden>
+      <div class="wrap">
+        <h2 id="stats-title" class="visually-hidden">Your plan in numbers</h2>
+        <dl class="figs">
+          <div><dt>Events</dt><dd class="num" data-stat="count">0</dd><dd class="sub" data-stat="days"></dd></div>
+          <div><dt>Time</dt><dd class="num" data-stat="hours">0</dd><dd class="sub">hours of events</dd></div>
+          <div data-clash-fig><dt>Clashes</dt><dd class="num" data-stat="clashes">0</dd><dd class="sub" data-stat="clash-text"></dd></div>
+          <div><dt>Entry fees</dt><dd class="num" data-stat="fees">₹0</dd><dd class="sub" data-stat="free"></dd></div>
+          <div class="wide"><dt>Next deadline</dt><dd class="num" data-stat="deadline">None</dd><dd class="sub" data-stat="deadline-for"></dd></div>
+        </dl>
+        <div class="plan-actions">
+          <button type="button" class="button" data-plan-ics>Add all to calendar</button>
+          <button type="button" class="button quiet" data-plan-share>Share this plan</button>
+          <button type="button" class="plain-btn" data-plan-clear>Clear plan</button>
+        </div>
+        <p class="msg small" data-plan-msg role="status"></p>
+      </div>
+    </section>
+
+    <section class="empty wrap" data-plan-empty aria-labelledby="empty-title">
+      <h2 id="empty-title" class="head">Nothing saved yet.</h2>
+      <p class="lead">Press <b>Save</b> on any event, in the list or on its page, and it lands here. Save two that overlap and we’ll tell you.</p>
+      <div class="empty-actions">
+        <a class="button" href="/events/">Browse all events</a>
+        <a class="button quiet" href="/events/?view=timetable">Open the timetable</a>
+      </div>
+      {picks.length > 0 && (
+        <div class="starters">
+          <h3 class="small soft starters-title">Or start with the organisers’ picks</h3>
+          <ul class="plain" role="list">
+            {picks.map((v) => <EventRow v={v} headingLevel="h4" />)}
+          </ul>
+        </div>
+      )}
+    </section>
+
+    <section class="list wrap" aria-labelledby="list-title" data-plan-filled hidden>
+      <h2 id="list-title" class="visually-hidden">Events in your plan</h2>
+      {groups.map((g) => (
+        <section class="group" data-plan-day={g.day} aria-labelledby={`p-${g.day}`} hidden>
+          <h3 id={`p-${g.day}`} class="group-title">
+            <span class="dn">{fmtDay(g.day, 'long')}</span>
+            <span class="gc soft" data-day-count></span>
+          </h3>
+          <ul class="plain" role="list">
+            {g.items.map((v) => <EventRow v={v} headingLevel="h4" hidden />)}
+          </ul>
+        </section>
+      ))}
+    </section>
+
+    <section class="glance chapter" data-chapter="tone" aria-labelledby="glance-title" data-plan-filled hidden>
+      <div class="wrap">
+        <h2 id="glance-title" class="head">Your weekend at a glance</h2>
+        <p class="soft glance-help">Your events stand out; everything else is faded, so the gaps in your weekend are easy to see.</p>
+        <Timetable views={ov.upcoming} days={days} />
+      </div>
+    </section>
+  </div>
+</Base>
+
+<script>
+  import { startLive } from '../../scripts/live';
+  import { startPlanPage } from '../../scripts/plan-page';
+  startPlanPage();
+  startLive();
+</script>
+
+<style>
+  .intro { padding-block: clamp(2rem, 4vw, 3.5rem) clamp(1.5rem, 3vw, 2.5rem); }
+  .intro-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.5rem 4rem; align-items: end; }
+  .page-title { font-size: clamp(3.75rem, 1rem + 6.4vw, 7.5rem); }
+  .intro-side { display: grid; gap: 0.75rem; max-width: 46ch; padding-bottom: 0.6rem; }
+
+  .shared { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem 2rem; padding-block: 1.5rem; background: var(--tone); margin-bottom: 2rem; }
+  .shared b { color: var(--navy); }
+  .shared-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+  .stats { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+  .figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.5fr); gap: 2rem var(--gutter); margin: 0; }
+  .figs dt { font-size: var(--fs-small); font-weight: 600; color: var(--on-navy-soft); }
+  .figs dd { margin: 0; }
+  .figs .num {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 760;
+    font-size: clamp(2.75rem, 1.6rem + 3vw, 4.5rem);
+    line-height: 1;
+    margin-top: 0.35rem;
+  }
+  .figs .wide .num { font-size: clamp(2rem, 1.3rem + 2vw, 3.25rem); line-height: 1.05; }
+  .figs .sub { color: var(--on-navy-soft); margin-top: 0.35rem; font-size: var(--fs-small); }
+  .figs [data-clash-fig][data-has] .num { color: var(--accent); }
+  .plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: clamp(2rem, 5vw, 3rem); }
+  .plain-btn {
+    background: none;
+    border: 0;
+    color: var(--on-navy-soft);
+    font-weight: 560;
+    min-height: 3rem;
+    padding-inline: 0.75rem;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .plain-btn:hover { color: var(--paper); }
+  .msg { margin-top: 1rem; min-height: 1.5em; color: var(--on-navy-soft); }
+  .msg :global(button) { background: none; border: 0; padding: 0; color: var(--paper); font: inherit; font-weight: 650; text-decoration: underline; cursor: pointer; }
+
+  .empty { padding-block: 2rem var(--section); display: grid; gap: 1rem; justify-items: start; }
+  .empty .lead { max-width: 44ch; }
+  .empty-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+  .starters { margin-top: 3rem; width: 100%; }
+  .empty :global(.undo) { font-weight: 560; }
+  .empty :global(.undo button) { background: none; border: 0; padding: 0.25rem; margin-left: 0.25rem; font: inherit; font-weight: 700; color: var(--navy); text-decoration: underline; cursor: pointer; }
+  .starters-title { font-weight: 600; margin-bottom: 0.5rem; }
+
+  .list { padding-block: clamp(1.5rem, 4vw, 3rem) var(--section); }
+  .group { margin-top: 1.75rem; }
+  .group-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.25rem 1rem; padding: 0.5rem 0 0.75rem; }
+  .group-title .dn { font-family: var(--font-display); font-stretch: 75%; font-weight: 760; font-size: clamp(2rem, 1.4rem + 1.8vw, 3.25rem); line-height: 0.95; }
+  .group-title .gc { font-size: 1rem; font-weight: 500; }
+
+  .glance { padding-block: var(--section); }
+  .glance-help { max-width: 60ch; margin: 1rem 0 2.5rem; }
+
+  @media (max-width: 1100px) {
+    .figs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .figs .wide { grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    .intro-grid { grid-template-columns: 1fr; }
+    .page-title { font-size: clamp(4rem, 1rem + 15vw, 6rem); }
+    .plan-actions .button { flex: 1 1 auto; }
+  }
+</style>

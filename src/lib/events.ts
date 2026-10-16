@@ -142,7 +142,9 @@ export function toView(e: EventDetail, now = Date.now()): EventView {
     subtitle,
     days: [...new Set(sessions.map((s) => s.event_date))],
     firstDay: ss.start_date,
-    isPast: e.event_status !== 'ACTIVE' || istEpoch(ss.end_date, ss.end_time) < now,
+    // CLOSED means registration is closed, not that the event has happened: a closed event
+    // with dates ahead stays in the upcoming list, marked "Closed".
+    isPast: e.event_status === 'COMPLETED' || istEpoch(ss.end_date, ss.end_time) < now,
     whenDate: when.date,
     whenTime: when.time,
     whenShort: when.short,
@@ -176,6 +178,27 @@ export interface Overview {
   free: number;
   first?: EventView;
   last?: EventView;
+  /** The main run of consecutive days (the fest weekend), its events, and anything outside it. */
+  mainDays: string[];
+  main: EventView[];
+  extra: EventView[];
+  mainFirst?: EventView;
+  mainLast?: EventView;
+}
+
+const dayMs = (d: string) => Date.parse(`${d}T00:00:00Z`);
+
+/** The longest run of consecutive days; ties go to the run with more events. */
+function mainRun(days: string[], count: (d: string) => number): string[] {
+  let best: string[] = [];
+  let run: string[] = [];
+  for (const d of days) {
+    if (run.length && dayMs(d) - dayMs(run[run.length - 1]) !== 86_400_000) run = [];
+    run.push(d);
+    const score = (r: string[]) => r.reduce((n, x) => n + count(x), 0);
+    if (run.length > best.length || (run.length === best.length && score(run) > score(best))) best = [...run];
+  }
+  return best;
 }
 
 export function overview(views: EventView[]): Overview {
@@ -184,11 +207,15 @@ export function overview(views: EventView[]): Overview {
   const days = [...new Set(upcoming.flatMap((v) => v.days))].sort();
   const open = upcoming.filter((v) => v.avail.canRegister);
   const lastByEnd = [...upcoming].sort((a, b) => b.endMs - a.endMs)[0];
+  const mainDays = mainRun(days, (d) => upcoming.filter((v) => v.days.includes(d)).length);
+  const main = upcoming.filter((v) => v.days.some((d) => mainDays.includes(d)));
+  const extra = upcoming.filter((v) => !main.includes(v));
   return {
     upcoming,
     past,
     days,
-    seatsTotal: upcoming.reduce((n, v) => n + v.e.total_seats, 0),
+    // Same rule as the live count in the browser: seats of events still running (not closed).
+    seatsTotal: upcoming.filter((v) => v.e.event_status === 'ACTIVE').reduce((n, v) => n + v.e.total_seats, 0),
     seatsLeft: open.reduce((n, v) => n + v.avail.seatsLeft, 0),
     openCount: open.length,
     prizePool: upcoming.reduce((n, v) => n + v.e.prizes.reduce((m, p) => m + p.amount, 0), 0),
@@ -196,6 +223,11 @@ export function overview(views: EventView[]): Overview {
     free: upcoming.filter((v) => v.e.price === 0).length,
     first: upcoming[0],
     last: lastByEnd,
+    mainDays,
+    main,
+    extra,
+    mainFirst: main[0],
+    mainLast: [...main].sort((a, b) => b.endMs - a.endMs)[0],
   };
 }
 

@@ -188,6 +188,8 @@ const timetable = days.map((day) => {
   .tt-ev:is([data-avail='soldout'], [data-avail='regclosed'], [data-avail='closed'], [data-avail='removed']) .status {
     color: var(--ink-soft);
   }
+  /* Events in your plan get a tangerine frame. */
+  .tt-ev[data-saved] a { box-shadow: inset 0 0 0 3px var(--accent); }
   .tt-ev.dim { opacity: 0.18; }
   .tt-ev.dim a { pointer-events: none; }
 </style>

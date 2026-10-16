@@ -4,6 +4,7 @@
 export function startChrome() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   startEasterEggs();
+  settleAnchors();
 
   // Reveals
   const items = document.querySelectorAll<HTMLElement>('[data-reveal]');
@@ -58,6 +59,27 @@ export function startChrome() {
   window.addEventListener('scroll', schedule, { passive: true });
   window.addEventListener('resize', schedule, { passive: true });
   update();
+}
+
+// ---- anchor jumps -------------------------------------------------------------
+// Off-screen sections skip layout (content-visibility: auto), so the browser aims an anchor
+// jump using estimated heights and can land short or long. When the address has a #section,
+// lay everything out for one frame, jump again exactly, then let sections skip layout again
+// (they remember their real heights, so nothing moves afterwards).
+function settleAnchors() {
+  const settle = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const el = id ? document.getElementById(id) : null;
+    if (!el) return;
+    const root = document.documentElement;
+    root.classList.add('jumping');
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ block: 'start' });
+      requestAnimationFrame(() => root.classList.remove('jumping'));
+    });
+  };
+  if (location.hash) settle();
+  window.addEventListener('hashchange', settle);
 }
 
 // ---- easter eggs ------------------------------------------------------------
