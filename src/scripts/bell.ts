@@ -1,4 +1,4 @@
-// Easter egg: "Class dismissed."
+// Signature detail: "Class dismissed."
 // Type the site's name anywhere, or click the big wordmark in the footer. A school bell rings
 // (synthesised with Web Audio, nothing downloaded) and the navy field from the hero rises over
 // the whole screen. Click, press any key, or wait, and it carries on upwards and out of sight.

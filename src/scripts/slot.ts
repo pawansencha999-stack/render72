@@ -3,7 +3,7 @@
 // 1. It cycles through events you can still join. Only the first photo loads with the page;
 //    the rest arrive after the page has finished loading, so the cycle never competes with the
 //    first paint. Paused off-screen and for reduced motion.
-// 2. Easter egg: it is a slot machine. Click it (or focus it and press Enter) and it spins,
+// 2. Signature detail: it is a slot machine. Click it (or focus it and press Enter) and it spins,
 //    slows down and deals you one event, which the hero then offers to you.
 
 export function startSlot() {

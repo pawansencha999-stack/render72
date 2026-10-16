@@ -3,7 +3,7 @@
 
 export function startChrome() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  startEasterEggs();
+  startSignatureDetails();
   settleAnchors();
 
   // Reveals
@@ -82,9 +82,9 @@ function settleAnchors() {
   window.addEventListener('hashchange', settle);
 }
 
-// ---- easter eggs ------------------------------------------------------------
+// ---- signature details ------------------------------------------------------
 
-function startEasterEggs() {
+function startSignatureDetails() {
   // A note for anyone who opens the developer tools.
   console.log(
     '%cafterclass%c\nBuilt for Render72 with Astro: static HTML, about 20 KB of JavaScript, live seat counts.\nTwo things to try: click the photo in the home page headline, and type this site\'s name anywhere.',

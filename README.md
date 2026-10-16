@@ -38,9 +38,9 @@ Every event has a **Save** button, in the events list and on its own page, and s
 
 The plan is kept in the browser (`localStorage`) and never sent anywhere. The header shows how many events are in it, and it stays in step across open tabs. Session times for clash checks come from `/plan-data.json`, built with the site and fetched only when there is something to check.
 
-## Easter eggs
+## Signature details
 
-Two, both built from the page's own design rather than bolted on:
+Two playful details that make the site its own, both built from the page's design rather than bolted on:
 
 - **The photo in the headline is a slot machine.** Click it (or Tab to it and press Enter). It spins through the weekend's events, slows down and deals you one that still has seats, and the hero offers you that event, with its live seat count. Spin again, or go back.
 - **The site answers to its name.** Type `afterclass` anywhere, or click the giant wordmark in the footer. A school bell rings (synthesised with Web Audio, no sound file) and the hero's navy field rises over the screen: *Class dismissed.*
@@ -152,7 +152,7 @@ src/
                 format.ts (IST dates, ₹, team sizes), availability.ts, images.ts, calendar.ts
   scripts/      live.ts (live seats, cache, retry), events-page.ts (search/filter/sort/URL),
                 event-page.ts, slot.ts (hero photos, slot machine), chrome.ts (header colour,
-                reveals, easter eggs), bell.ts ("Class dismissed"), motion.ts (tilt, magnetic
+                reveals, signature details), bell.ts ("Class dismissed"), motion.ts (tilt, magnetic
                 buttons, hero depth, ticker, finder previews), plan.ts (saving, clash notes),
                 plan-page.ts (the plan page), countdown.ts
   components/   Header, Footer, EventRow, Timetable, Pic
